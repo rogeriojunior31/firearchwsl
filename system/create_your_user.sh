@@ -5,7 +5,6 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-# Install Sudo
 pacman -S --noconfirm --needed sudo
 
 read -rp "Digite o nome do novo usuário: " usuario
@@ -21,11 +20,14 @@ echo "Digite a senha para o usuário $usuario:"
 passwd "$usuario"
 
 if id "$usuario" &>/dev/null; then
-  echo "✅ Usuário '$usuario' criado com sucesso e adicionado ao grupo wheel!"
-  echo "Lembre-se de garantir que no seu /etc/sudoers o grupo wheel tenha acesso ao sudo."
+  echo "Usuário '$usuario' criado com sucesso e adicionado ao grupo wheel!"
 else
   echo "❌ Falha ao criar o usuário."
 fi
 
-# Usuario no sudoers
 sed -i '/^# %wheel ALL=(ALL) ALL/s/^# //' /etc/sudoers
+echo "Usuário adicionado para ter permissão de sudo!"
+
+su $usuario
+
+echo "Tudo configurado e vc ja esta na sua area de trabalha haha."
