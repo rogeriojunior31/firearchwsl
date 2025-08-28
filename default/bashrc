@@ -1,0 +1,193 @@
+[[ $- == *i* ]] && bind -f ~/.local/share/omarchy/default/bash/inputrc
+
+## EDITOR ##
+export EDITOR="nvim"
+export SUDO_EDITOR="$EDITOR"
+export BAT_THEME=ansi
+
+## Prompt ##
+# Technicolor dreams
+force_color_prompt=yes
+color_prompt=yes
+
+# Simple prompt with path in the window/pane title and caret for typing line
+PS1=$'\uf0a9 '
+PS1="\[\e]0;\w\a\]$PS1"
+
+## History control ##
+shopt -s histappend
+HISTCONTROL=ignoreboth
+HISTSIZE=32768
+HISTFILESIZE="${HISTSIZE}"
+
+## Autocompletion ##
+if [[ ! -v BASH_COMPLETION_VERSINFO && -f /usr/share/bash-completion/bash_completion ]]; then
+  source /usr/share/bash-completion/bash_completion
+fi
+
+## PATH ##
+# Set complete path
+export PATH="./bin:$HOME/.local/bin:$PATH"
+set +h
+
+## Function ##
+
+# Transcode a video to a good-balance 1080p that's great for sharing online
+transcode-video-1080p() {
+  ffmpeg -i $1 -vf scale=1920:1080 -c:v libx264 -preset fast -crf 23 -c:a copy ${1%.*}-1080p.mp4
+}
+
+# Transcode a video to a good-balance 4K that's great for sharing online
+transcode-video-4K() {
+  ffmpeg -i $1 -c:v libx265 -preset slow -crf 24 -c:a aac -b:a 192k ${1%.*}-optimized.mp4
+}
+
+# Transcode any image to JPG image that's great for shrinking wallpapers
+img2jpg() {
+  magick $1 -quality 95 -strip ${1%.*}.jpg
+}
+
+# Transcode any image to JPG image that's great for sharing online without being too big
+img2jpg-small() {
+  magick $1 -resize 1080x\> -quality 95 -strip ${1%.*}.jpg
+}
+
+# Transcode any image to compressed-but-lossless PNG
+img2png() {
+  magick "$1" -strip -define png:compression-filter=5 \
+    -define png:compression-level=9 \
+    -define png:compression-strategy=1 \
+    -define png:exclude-chunk=all \
+    "${1%.*}.png"
+}
+
+## ALIASES ##
+# Editors #
+# Helix
+alias h="helix"
+alias hx="helix"
+
+# Neovim
+alias v="nvim"
+alias vi="nvim"
+
+# Emacs
+alias emacs="emacsclient -c -a 'emacs'"
+alias em="/usr/bin/emacs -nw"
+alias rem="killall emacs || echo 'Emacs server not running' /usr/bin/emacs --daemon"
+
+# File Manager #
+# Yazi
+alias yz='yazi'
+
+# Navigation #
+alias ..='cd ..'
+alias ...='cd ../..'
+alias .3='cd ../../..'
+alias .4='cd ../../../..'
+alias .5='cd ../../../../..'
+
+# Changing "ls" to "eza"
+alias ls='eza --color=always --icons=always'
+alias la='eza -a --color=always --group-directories-first --icons=always'              # all files and dirs
+alias ll='eza -al --color=always --group-directories-first --icons=always'             # long format
+alias l.='eza -al --color=always --group-directories-first ../ --icons=always'         # ls on the PARENT directory
+alias l..='eza -al --color=always --group-directories-first ../../ --icons=always'     # ls on directory 2 levels up
+alias l...='eza -al --color=always --group-directories-first ../../../ --icons=always' # ls on directory 3 levels up
+alias lt='eza --tree --level=2 --long --icons --git'
+
+# Package Managers #
+# Pacman
+alias pacsyu='sudo pacman -Syu'
+alias pacsyyu='sudo pacman -Syyu'
+alias unlock='sudo rm /var/lib/pacman/db.lck' # remove pacman lock
+
+# Paru
+alias parsua='paru -Sua --noconfirm'
+alias parsyu='paru -Syu --noconfirm'
+
+# Yay
+alias yaysyu='yay -S --noconfirm'
+
+# Tools #
+# Git
+alias gaddall='git add .'
+alias gadd='git add -u'
+alias gcheckout='git checkout'
+alias gclone='git clone'
+alias gcommit='git commit -m'
+alias gpull='git pull origin'
+alias gpush='git push origin'
+alias gbranch='git branch'
+
+# Mise
+alias ms="mise"
+alias msr="mise run"
+alias msup="mise upgrade"
+alias msu="mise use"
+alias msi="mise install"
+
+# Zellij
+alias zlj="zellij"
+alias zljs="zellij -s"
+alias zlsa="zellij a"
+alias zljds="zellij delete-all-sessions"
+
+# TaskWarrior
+alias t='task'
+alias ta='task add'
+alias td='task done'
+alias tn='task next'
+alias tl='task list'
+alias tdaily='~/.scripts/bash/task_scripts/daily_task_report.sh'
+alias tweekly='~/.scripts/bash/task_scripts/weeky_task_report.sh'
+alias taskui="taskwarrior-tui"
+
+# Utils #
+# change default USER shell
+alias tobash="chsh $USER -s /usr/bin/bash && echo 'Log out and log back in for change to take effect.'"
+alias tozsh="chsh $USER -s /usr/bin/zsh && echo 'Log out and log back in for change to take effect.'"
+alias tofish="chsh $USER -s /usr/bin/fish && echo 'Log out and log back in for change to take effect.'"
+alias tonu="chsh $USER -s /usr/bin/nu && echo 'Log out and log back in for change to take effect.'"
+
+# alias chmod commands
+alias mx='chmod a+x'
+alias 000='chmod -R 000'
+alias 644='chmod -R 644'
+alias 666='chmod -R 666'
+alias 755='chmod -R 755'
+alias 777='chmod -R 777'
+
+# Rickroll
+alias rr='curl -s -L https://raw.githubusercontent.com/keroserene/rickrollrc/master/roll.sh | bash'
+
+## INIT ##
+# Mise
+if command -v mise &>/dev/null; then
+  eval "$(mise activate bash)"
+fi
+
+# Starship
+if command -v starship &>/dev/null; then
+  eval "$(starship init bash)"
+fi
+
+# Zoxide
+if command -v zoxide &>/dev/null; then
+  eval "$(zoxide init bash)"
+fi
+
+# Atuin
+if command -v atuin &>/dev/null; then
+  eval "$(atuin init bash)"
+fi
+
+# Fzf
+if command -v fzf &>/dev/null; then
+  if [[ -f /usr/share/fzf/completion.bash ]]; then
+    source /usr/share/fzf/completion.bash
+  fi
+  if [[ -f /usr/share/fzf/key-bindings.bash ]]; then
+    source /usr/share/fzf/key-bindings.bash
+  fi
+fi
