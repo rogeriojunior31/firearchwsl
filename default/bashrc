@@ -4,6 +4,8 @@
 export EDITOR="nvim"
 export SUDO_EDITOR="$EDITOR"
 export BAT_THEME=ansi
+export GALLIUM_DRIVER=d3d12
+export LIBVA_DRIVER_NAME=d3d12
 
 ## Prompt ##
 # Technicolor dreams
@@ -191,3 +193,6 @@ if command -v fzf &>/dev/null; then
     source /usr/share/fzf/key-bindings.bash
   fi
 fi
+
+# janelas ssh
+eval "$(/usr/sbin/wsl2-ssh-agent)"
