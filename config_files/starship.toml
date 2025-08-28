@@ -1,0 +1,221 @@
+## Starship Config
+## Author: Rogerio Junior
+
+format = """
+$os\
+$username\
+$directory\
+(\
+    $python\
+    $nodejs\
+    $bun\
+    $deno\
+    $odin\
+    $mojo\
+    $lua
+    $c\
+    $java\
+    $rust\
+    $zig\
+)\
+[](fg:fourth bg:fifth)\
+$docker_context\
+[](fg:fifth bg:sixth)\
+(\
+    $git_branch\
+    $git_status\
+)\
+[](fg:sixth bg:seventh)\
+$time\
+$cmd_duration\
+$character\
+"""
+
+# Palettes:
+#   opal.
+#   tokyonight
+#   tokyonight-storm
+#   github_dark
+
+palette = "tokyonight"
+
+# Disables the blank line at the start of the prompt
+add_newline = true
+command_timeout = 200
+
+
+[palettes.opal]
+first = "#38959E"
+second = "#37929D"
+third = "#358F9B"
+fourth = "#358CA0"
+fifth = "#3689A2"
+sixth = "#3785A4"
+seventh = "#3982A9"
+eighth = "#3A7EAE"
+error = "#C1121F"
+# Text color:
+black = "#272D37"
+white = "#CBF4F8"
+github = "#B02B10"
+
+
+[palettes.tokyonight]
+first  = "#1f2335"
+second = "#24283b"
+third  = "#292e42"
+fourth = "#3b4261"
+fifth  = "#414868"
+sixth  = "#545c7e"
+seventh= "#565f89"
+eighth = "#737aa2"
+error  = "#f7768e"
+# Text color:
+black  = "#1a1b26"
+white  = "#c0caf5"
+github = "#7aa2f7"
+
+[palettes.github_dark]
+first   = "#0d1117"
+second  = "#161b22" 
+third   = "#21262d"
+fourth  = "#30363d"
+fifth   = "#484f58"
+sixth   = "#6e7681"
+seventh = "#8b949e"
+eighth  = "#b1bac4"
+error   = "#f85149"
+# Text color:
+black   = "#010409"
+white   = "#f0f6fc"
+github  = "#58a6ff"
+
+[os]
+format = "[](first)[$symbol]($style)[](fg:first bg:second)"
+style = "bg:first fg:white"
+disabled = false
+
+[os.symbols]
+Alpine = " "
+Android = " "
+Arch = " "
+Linux = " "
+NixOS = " "
+Raspbian = " "
+Ubuntu = " "
+Unknown = " "
+Windows = " "
+
+[username]
+show_always = true
+style_user = "bg:second fg:white"
+style_root = "bg:second fg:white"
+format = '[$user]($style)[](fg:second bg:third)'
+
+[directory]
+style = "bg:third fg:white"
+format = "[ $path ]($style)($style)[$read_only]($read_only_style)[](fg:third bg:fourth)"
+truncation_symbol = "…/"
+truncate_to_repo = true
+read_only ="  "
+
+[c]
+symbol = " "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[python]
+symbol = " "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+python_binary = ["./venv/bin/python", "./env/Scripts/python", "python", "python3", "python2"]
+format = '[$symbol($version)${pyenv_prefix}]($style)[ (\($virtualenv\)) ](bg:fourth fg:white)'
+
+[java]
+symbol = " "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[nodejs]
+symbol = "󰎙 "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[deno]
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[bun]
+symbol = "🥟 "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[rust]
+symbol = " "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[zig]
+symbol = "  "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[lua]
+symbol = "  "
+version_format = "${raw}"
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[odin]
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[mojo]
+style = "bg:fourth fg:white"
+format = '[$symbol($version) ]($style)'
+
+[docker_context]
+symbol = " "
+style = "bg:fifth fg:white"
+format = '[$symbol $context ]($style)'
+
+[git_branch]
+symbol = " "
+style = "bg:sixth fg:white"
+format = '[$symbol $branch ]($style)'
+
+[git_status]
+format = '([\($all_status$ahead_behind\) ]($style))'
+style = "bold bg:sixth fg:github"
+ahead      = "⇡${count} "
+diverged   = "⇕⇡${ahead_count}⇣${behind_count} "
+behind     = "⇣${count} "
+conflicted = " "
+up_to_date = " "
+untracked  = "? "
+modified   = " "
+stashed    = ""
+staged     = ""
+renamed    = ""
+deleted    = ""
+
+[time]
+disabled = false
+time_format = "%R"
+style = "bg:seventh fg:white"
+format = '[  $time]($style)[](fg:seventh bg:eighth)'
+
+[cmd_duration]
+style = "bg:eighth fg:white"
+format = '[  $duration ]($style)'
+
+[character]
+success_symbol = "[](fg:eighth bg:eighth)[](fg:eighth)"
+error_symbol = "[](fg:eighth bg:error)[](fg:error)"
