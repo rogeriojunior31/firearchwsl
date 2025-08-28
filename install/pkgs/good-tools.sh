@@ -27,6 +27,10 @@ PACMAN_PKGS=(
   "tldr"
   "tree-sitter-cli"
   "zoxide"
+  "cargo"
+  "python-poetry-core"
+  "python-terminaltexteffects"
+  "bash-completion"
 )
 
 msg() { printf '\e[1;32m[INFO]\e[0m %s\n' "$*"; }
