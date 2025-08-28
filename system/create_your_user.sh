@@ -5,6 +5,9 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# Install Sudo
+pacman -S --noconfirm --needed sudo
+
 read -rp "Digite o nome do novo usuário: " usuario
 
 if id "$usuario" &>/dev/null; then
@@ -23,3 +26,6 @@ if id "$usuario" &>/dev/null; then
 else
   echo "❌ Falha ao criar o usuário."
 fi
+
+# Usuario no sudoers
+sed -i '/^# %wheel ALL=(ALL) ALL/s/^# //' /etc/sudoers
