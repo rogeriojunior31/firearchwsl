@@ -10,6 +10,8 @@ PACMAN_PKGS=(
   "fd"
   "ripgrep"
   "7zip"
+  "zip"
+  "unzip"
   "task"
   "zellij"
   "neovim"
@@ -31,6 +33,14 @@ PACMAN_PKGS=(
   "python-poetry-core"
   "python-terminaltexteffects"
   "bash-completion"
+  "yay"
+  "paru"
+  "luarocks"
+  "ttf-cascadia-mono-nerd"
+  "ttf-jetbrains-mono"
+  "ttf-hack-nerd"
+  "fastfetch"
+  "emacs"
 )
 
 msg() { printf '\e[1;32m[INFO]\e[0m %s\n' "$*"; }
