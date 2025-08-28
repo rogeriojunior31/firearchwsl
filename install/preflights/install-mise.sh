@@ -8,8 +8,8 @@ if ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 
-msg "Atualizando índices e instalando 'mise' do repositório Extra (evita upgrade parcial)..."
-sudo pacman -Syu --needed --noconfirm mise
+msg "Instalando Mise..."
+sudo pacman -S --needed --noconfirm mise
 
 SHELL_NAME="$(basename "${SHELL:-}")"
 case "$SHELL_NAME" in
@@ -46,4 +46,4 @@ fi
 msg "Verificando versão do mise..."
 mise --version || true
 
-msg "Concluído. Mise instalado e configurad
+msg "Concluído. Mise instalado e configurado!"
