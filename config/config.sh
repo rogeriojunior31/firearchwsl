@@ -1,18 +1,18 @@
 #!/bin/bash
 
-mkdir -o ~/.config
+mkdir ~/.config
 
 # Create firewarchwsl in .local
-mkdir -o ~/.local/share/firearchwsl
-mkdir -o ~/.local/share/firearchwsl/config
+mkdir ~/.local/share/firearchwsl
+mkdir ~/.local/share/firearchwsl/config
 
-mkdir -o ~/.local/share/firearchwsl/default
+mkdir ~/.local/share/firearchwsl/default
 
 # Copy firewarchwsl configs
 cp -R ../config_files/ ~/.local/share/firearchwsl/config/
 
 # Use default fish from FireArchWsl
-mkdir -o ~/.config/fish
+mkdir ~/.config/fish
 cp ~/.local/share/firearchwsl/default/config.fish ~/.config/fish
 
 # Use default bashrc from FireArchWsl
