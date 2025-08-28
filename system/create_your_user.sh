@@ -27,7 +27,3 @@ fi
 
 sed -i '/^# %wheel ALL=(ALL) ALL/s/^# //' /etc/sudoers
 echo "Usuário adicionado para ter permissão de sudo!"
-
-su $usuario
-
-echo "Tudo configurado e vc ja esta na sua area de trabalha haha."
