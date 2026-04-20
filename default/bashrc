@@ -1,4 +1,4 @@
-[[ $- == *i* ]] && bind -f ~/.local/share/omarchy/default/bash/inputrc
+[[ $- == *i* && -r ~/.local/share/firearchwsl/default/inputrc ]] && bind -f ~/.local/share/firearchwsl/default/inputrc
 
 ## EDITOR ##
 export EDITOR="nvim"
@@ -195,4 +195,6 @@ if command -v fzf &>/dev/null; then
 fi
 
 # janelas ssh
-eval "$(/usr/sbin/wsl2-ssh-agent)"
+if [[ -x /usr/sbin/wsl2-ssh-agent ]]; then
+  eval "$(/usr/sbin/wsl2-ssh-agent)"
+fi

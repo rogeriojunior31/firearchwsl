@@ -153,16 +153,26 @@ alias rr='curl -s -L https://raw.githubusercontent.com/keroserene/rickrollrc/mas
 
 ### Init ###
 ## Starship
-starship init fish | source
+if command -v starship &>/dev/null
+    starship init fish | source
+end
 
 ## Zoxide
-zoxide init fish | source
+if command -v zoxide &>/dev/null
+    zoxide init fish | source
+end
 
 ## Mise
-mise activate fish | source
+if command -v mise &>/dev/null
+    mise activate fish | source
+end
 
 ## Atuin
-atuin init fish | source
+if command -v atuin &>/dev/null
+    atuin init fish | source
+end
 
 ## SSH
-eval (ssh-agent -c)
+if command -v ssh-agent &>/dev/null; and not set -q SSH_AUTH_SOCK
+    eval (ssh-agent -c) >/dev/null
+end

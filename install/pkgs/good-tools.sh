@@ -59,11 +59,8 @@ ensure_sudo() {
 }
 
 main() {
-
-  msg "Atualizando pacman/paru…"
   ensure_sudo
-  sudo pacman -Syu --noconfirm
-
+  # Sync já feito por repositories.sh (pós-keyring).
   msg "Instalando pacotes pacman…"
   sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}"
 
