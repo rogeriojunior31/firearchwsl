@@ -1,19 +1,16 @@
 #!/bin/bash
 
-# Obter o usuário não-root (assumindo que é o primeiro usuário no grupo wheel além do root)
-TARGET_USER=$(getent group wheel | cut -d: -f4 | tr ',' '\n' | grep -v "^$" | head -1)
+set -Eeuo pipefail
 
-if [ -z "$TARGET_USER" ]; then
-    echo "❌ Usuário não encontrado no grupo wheel"
-    exit 1
-fi
+: "${TARGET_USER:?TARGET_USER não definido — rode via install.sh}"
+: "${TARGET_HOME:?TARGET_HOME não definido — rode via install.sh}"
 
-TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+# Raiz do repo — via FIREARCH_ROOT (exportado por install.sh) com fallback
+FIREARCH_ROOT="${FIREARCH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-if [ -z "$TARGET_HOME" ] || [ ! -d "$TARGET_HOME" ]; then
-    echo "❌ Diretório home do usuário $TARGET_USER não encontrado"
-    exit 1
-fi
+# FORCE_CONFIG=1 sobrescreve edits locais do user em rcfiles. Default: preserva.
+cp_flag="-n"
+[[ "${FORCE_CONFIG:-}" == "1" ]] && cp_flag=""
 
 echo "📁 Configurando para usuário: $TARGET_USER (home: $TARGET_HOME)"
 
@@ -22,22 +19,22 @@ mkdir -p "$TARGET_HOME/.config"
 mkdir -p "$TARGET_HOME/.local/share/firearchwsl/config"
 mkdir -p "$TARGET_HOME/.local/share/firearchwsl/default"
 
-# Copiar arquivos de configuração
-cp -R ../config_files/* "$TARGET_HOME/.local/share/firearchwsl/config/"
+# Payloads versionados — sempre sobrescreve (é o contrato do repo ser fonte)
+cp -R "$FIREARCH_ROOT/config_files/"* "$TARGET_HOME/.local/share/firearchwsl/config/"
+cp "$FIREARCH_ROOT/default/"* "$TARGET_HOME/.local/share/firearchwsl/default/"
 
-# Copiar configurações padrão
-cp ../default/* "$TARGET_HOME/.local/share/firearchwsl/default/"
-
-# Configurar Fish shell
+# rcfiles — preserva edits locais por default (FORCE_CONFIG=1 para sobrescrever)
 mkdir -p "$TARGET_HOME/.config/fish"
-cp "$TARGET_HOME/.local/share/firearchwsl/default/config.fish" "$TARGET_HOME/.config/fish/"
+cp $cp_flag "$TARGET_HOME/.local/share/firearchwsl/default/config.fish" "$TARGET_HOME/.config/fish/config.fish" || true
+cp $cp_flag "$TARGET_HOME/.local/share/firearchwsl/default/bashrc" "$TARGET_HOME/.bashrc" || true
 
-# Configurar bashrc
-cp "$TARGET_HOME/.local/share/firearchwsl/default/bashrc" "$TARGET_HOME/.bashrc"
+# Starship: symlink para o toml versionado (caminho canônico que starship lê)
+ln -sf "$TARGET_HOME/.local/share/firearchwsl/config/starship.toml" "$TARGET_HOME/.config/starship.toml"
 
 # Ajustar permissões para o usuário correto
 chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config"
 chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.local"
-chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.bashrc"
+chown -h "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/starship.toml"
+[[ -e "$TARGET_HOME/.bashrc" ]] && chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.bashrc"
 
 echo "✅ Configurações aplicadas para $TARGET_USER"

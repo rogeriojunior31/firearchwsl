@@ -37,10 +37,7 @@ die() {
   exit 1
 }
 
-need_cmd() {
-  command -v "$1" &
-  /dev/null
-}
+need_cmd() { command -v "$1" &>/dev/null; }
 
 ensure_sudo() {
   if ((EUID != 0)); then
@@ -49,9 +46,9 @@ ensure_sudo() {
 }
 
 main() {
-  msg "Atualizando pacotes..."
-  sudo pacman -Syu --noconfirm
-  yay -Syu --noconfirm
+  ensure_sudo
+  msg "Sincronizando AUR (yay)..."
+  yay -Syu --noconfirm || warn "yay -Syu falhou — seguindo com pacman."
 
   msg "Instalando pacotes pacman..."
   sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}"

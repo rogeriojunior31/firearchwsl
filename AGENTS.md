@@ -1,4 +1,4 @@
-<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
+<!-- Generated: 2026-04-20 | Updated: 2026-04-20 (idempotency + user-scope refactor) -->
 
 # firearchwsl
 
@@ -27,22 +27,34 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 
 ### Working In This Directory
 
-- `install.sh` must remain runnable from the repo root — subscripts use relative paths (`./install`, `./system`, `./config`, and `config/config.sh` uses `../config_files`, `../default`). Do not change CWD mid-run.
-- Script order in `install.sh` is load-bearing. Summary: `pacman -Syu` → trap → user → locale → wsl → essentials → git-user → repositories → mise → good-tools → tuis → langs → editors → config → docker. Do not reshuffle without understanding each dependency.
+- **Entry-point is always `install.sh`.** Subscripts assume orchestrator context — they are not standalone-executable. Scripts user-scoped guardam `: "${TARGET_USER:?…}"` para falhar cedo se invocados fora.
+- `install.sh` exporta `FIREARCH_ROOT` (raiz absoluta do repo) — subscripts que referenciam payloads usam `$FIREARCH_ROOT/...`, não `../`.
+- Após `create_your_user.sh`, `install.sh` sourcia `install/preflights/lib.sh` e chama `ensure_target_user`. Isso exporta `TARGET_USER` e `TARGET_HOME` para todo o restante do pipeline.
+- **Fonte única de `TARGET_USER`**: escrita em `/etc/firearchwsl/target_user` por `create_your_user.sh`; lida por `lib.sh::resolve_target_user`. Fallback: primeiro membro do grupo wheel.
+- **Comandos user-scoped usam `as_user <cmd>`** (de `lib.sh`): `sudo -Hu "$TARGET_USER" env HOME="$TARGET_HOME" PATH=… -- <cmd>`. Sem prompt de senha porque root é sempre o caller.
+- **Re-run sobrescreve config?** `config/config.sh` preserva edits locais em `~/.bashrc` e `~/.config/fish/config.fish` por default (`cp -n`). Use `FORCE_CONFIG=1 bash install.sh` para forçar sobrescrita.
+- **Atomicidade**: falha no meio deixa sistema em estado parcial. `create_your_user.sh`, `repositories.sh`, pacman `--needed` etc. são idempotentes — re-run é seguro, mas não há rollback automático.
+- Script order in `install.sh` is load-bearing. Summary: `pacman -Syu` → trap → user → **lib** → locale → wsl → essentials → git-user → repositories → mise → good-tools → tuis → langs → editors → config → docker. Do not reshuffle without understanding each dependency.
 - User-facing strings (`echo`, `printf`, `read -rp`) are Portuguese. Preserve that tone.
-- Scripts are `#!/bin/bash`. New scripts should start with `set -Eeuo pipefail`; `install.sh` itself uses `set -eE` so the `ERR` trap fires.
-- Log helpers `msg` (green) / `warn` (yellow) / `die` (red) are duplicated across files on purpose so each is self-sourceable.
+- Scripts são `#!/bin/bash`. Novos scripts começam com `set -Eeuo pipefail`; `install.sh` usa `set -eE` para o `ERR` trap disparar.
+- Log helpers `msg`/`warn`/`die` vivem em `install/preflights/lib.sh`. Alguns scripts legacy ainda têm duplicação local — OK para os self-contained, consolidar ao editar.
 
 ### Testing Requirements
 
-- No tests, no CI, no lint config. Validation is: spin up a fresh Arch WSL distro and re-run `install.sh`. Scripts are designed to be idempotent (`--needed`, `mkdir -p`, `grep -q` guards, `[[ ! -d ... ]]`) — reruns should be safe.
+- No tests, no CI, no lint config. Validation é: Arch WSL fresh + `bash install.sh` + segundo run não aborta.
+- Antes de commitar: `bash -n` em cada `.sh` alterado; `shellcheck -x` se disponível.
+- `fish -n default/config.fish` valida fish config.
+- Teste unit do helper: `source install/preflights/lib.sh && TARGET_USER=$(whoami) TARGET_HOME=$HOME as_user whoami` deve imprimir seu user.
+- Container Arch (`docker run --rm -it archlinux bash`) roda até `docker.sh` — guard `[[ -d /run/systemd/system ]]` pula systemd quando ausente.
 
 ### Common Patterns
 
 - `PACMAN_PKGS=()` arrays grouped by intent (one per pkg file). Do not consolidate across groups.
-- Idempotency checks before mutating `/etc` (e.g. `grep -q "chaotic-aur" /etc/pacman.conf`).
-- Root-required scripts guard with `if [[ $EUID -ne 0 ]]`.
-- Interactive `read -rp` for values that must come from the human (username, git name/email).
+- `pacman -Syu --noconfirm` só em 2 pontos: `install.sh` inicial + `repositories.sh` pós-keyring. Demais scripts só instalam via `-S --needed --noconfirm`.
+- Idempotency checks antes de mutar `/etc` (ex: `grep -q "chaotic-aur" /etc/pacman.conf`, `visudo -c` pós-edit, `id -nG … | grep -qx docker` pré-`usermod`).
+- Root-required scripts guard com `if [[ $EUID -ne 0 ]]` e `return 1 2>/dev/null || exit 1` (porque são sourced — `exit` mataria o orquestrador).
+- Interactive `read -rp` para valores humanos (username, git name/email). `create_your_user.sh` pula o prompt se `/etc/firearchwsl/target_user` existe.
+- Comandos user-scoped via `as_user`; nunca `$HOME`/`$USER` diretos (são do root).
 
 ## Dependencies
 

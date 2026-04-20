@@ -1,14 +1,17 @@
 #!/bin/bash
 
-echo "Instalando python..."
-mise use -g python@latest
+set -Eeuo pipefail
 
-echo "Instalando node e bun..."
-mise use -g node@latest
-mise use -g bun@latest
+: "${TARGET_USER:?TARGET_USER não definido — rode via install.sh}"
 
-echo "instalando Rust.."
-mise use -g rust@latest
+install_lang() {
+  local lang="$1"
+  echo "Instalando $lang..."
+  as_user mise use -g "${lang}@latest" || warn "Falha ao instalar $lang — seguindo."
+}
 
-echo "instalando Go..."
-mise use -g go@latest
+install_lang python
+install_lang node
+install_lang bun
+install_lang rust
+install_lang go
