@@ -1,21 +1,47 @@
-# install/pkgs/
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
 
-Package groups installed after the preflight phase. Each script owns its own `PACMAN_PKGS=()` array (kept narrow on purpose — swap one group without disturbing others).
+# pkgs
 
-## Files
+## Purpose
 
-- `good-tools.sh` — general-purpose CLI: `jq`, `yq`, `stow`, `fd`, `ripgrep`, `task`, `zellij`, `neovim`, `glow`, `docker` + `docker-buildx` + `docker-compose`, `starship`, `zoxide`, `cargo`, `python-poetry-core`, `python-terminaltexteffects` (for the finale animation), `yay`, `paru`, nerd fonts, `emacs`, etc. `main()` runs `pacman -Syu` then installs with `--needed --noconfirm`.
-- `tuis.sh` — terminal UIs: `taskwarrior-tui`, `lazygit`, `television`, `navi`, `yazi` (+ preview deps: `imagemagick`, `poppler`, `ueberzug`, `chafa`, `ffmpegthumbnailer`, `mediainfo`, `odt2txt`, `perl-image-exiftool`, `w3m`), `fzf`, `atuin`, `lazydocker`, `superfile`. Also runs `yay -Syu`.
-  - Note: `need_cmd` here is buggy (split across two lines — the `&` backgrounds the command, redirects go nowhere). Not currently used by `main()`, so the bug is latent. Fix if you start using it.
-- `install_langs.sh` — language toolchains via mise (`mise use -g python@latest`, `node@latest`, `bun@latest`, `rust@latest`, `go@latest`). Runs after `install-mise.sh` has activated mise in the shell.
-- `editors.sh` — editors that are cloned, not pacman-installed:
-  - LazyVim starter into `~/.config/nvim`, strips `.git`, appends `vim.opt.relativenumber = false`.
-  - Doom Emacs into `~/.emacs.d`, runs `doom install`.
-  - Each clone is guarded on `[[ ! -d ... ]]`, so reruns skip.
+Package groups installed after the preflight phase. Each script owns its own `PACMAN_PKGS=()` array and `main()` that runs `pacman -Syu` (and `yay -Syu` for `tuis.sh`) before installing with `--needed --noconfirm`. Groups are kept narrow on purpose so a group can be swapped without disturbing others.
 
-## Conventions here
+## Key Files
 
-- Package group files are structured identically: shebang, `set -Eeuo pipefail`, `PACMAN_PKGS=()` array, `msg/warn/die` helpers, `ensure_sudo`, `main()`, `main "$@"`.
-- Always pass `--needed --noconfirm` to `pacman -S`.
-- Don't rely on user-mode tools inside these scripts — `install.sh` runs as root and the target non-root user only gets touched later in `config/config.sh`.
-- When adding a TUI, remember its preview/helper deps belong in the same array as the TUI itself (see yazi's cluster in `tuis.sh`).
+| File | Description |
+|------|-------------|
+| `good-tools.sh` | Core CLI utilities: `jq`, `yq`, `stow`, `fx`, `fd`, `ripgrep`, `7zip`/`zip`/`unzip`, `task`, `zellij`, `neovim`, `glow`, `harper`, `figlet`, `asciinema`, `docker` + `docker-buildx` + `docker-compose`, `dust`, `starship`, `tldr`, `tree-sitter-cli`, `zoxide`, `cargo`, `python-poetry-core`, `python-terminaltexteffects` (for `tte`), `bash-completion`, `yay`, `paru`, `luarocks`, nerd fonts (`cascadia-mono`, `jetbrains-mono`, `hack`), `fastfetch`, `emacs`. |
+| `tuis.sh` | Terminal UIs and yazi preview stack: `taskwarrior-tui`, `tabiew`, `lazygit`, `television`, `navi`, `yazi`, `imagemagick`, `poppler`, `fzf`, `atuin`, `rsync`, `chafa`, `resvg`, `ffmpegthumbnailer`, `libcaca`, `lynx`, `mediainfo`, `odt2txt`, `perl-image-exiftool`, `python-pillow`, `python-chardet`, `ueberzug`, `w3m`, `lazydocker`, `superfile`. Also runs `yay -Syu`. |
+| `install_langs.sh` | Language toolchains via mise: `mise use -g python@latest`, `node@latest`, `bun@latest`, `rust@latest`, `go@latest`. Runs after `preflights/install-mise.sh` has activated mise in the shell. |
+| `editors.sh` | Editors cloned (not pacman-installed): LazyVim starter into `~/.config/nvim` (strips `.git`, appends `vim.opt.relativenumber = false`); Doom Emacs into `~/.emacs.d` with `doom install`. Each clone guarded on `[[ ! -d ... ]]` so reruns skip. |
+
+## For AI Agents
+
+### Working In This Directory
+
+- File shape is uniform: shebang, `set -Eeuo pipefail`, `PACMAN_PKGS=()`, `msg`/`warn`/`die` helpers, `ensure_sudo`, `main()`, `main "$@"`. Copy the shape when adding a group.
+- Always pass `--needed --noconfirm` to `pacman -S`. Never drop `--needed`: reruns rely on it.
+- When adding a TUI with preview/helper deps, keep them in the same array (see the yazi cluster in `tuis.sh`).
+- Known latent bug: `tuis.sh`'s `need_cmd()` is split across two lines (`command -v "$1" &` then `/dev/null` on the next line) which backgrounds the check and misroutes the redirect. It's unused by `main()` today — fix if you start calling it.
+
+### Testing Requirements
+
+- Install idempotence: rerun after the first successful install should print "skipping" / "already installed" for every package.
+
+### Common Patterns
+
+- Don't assume the target non-root user exists yet at this phase only for `editors.sh` — it still writes into `$HOME`, which at install time is root's home (the user-config copy in `config/config.sh` happens later).
+
+## Dependencies
+
+### Internal
+
+- `../preflights/install-mise.sh` — must run before `install_langs.sh` so `mise` is on PATH.
+- `../preflights/repositories.sh` — Chaotic-AUR is often where TUIs come from.
+
+### External
+
+- `pacman`, `yay`, `mise`, `git`, LazyVim starter (`github.com/LazyVim/starter`), doomemacs (`github.com/doomemacs/doomemacs`).
+
+<!-- MANUAL: -->

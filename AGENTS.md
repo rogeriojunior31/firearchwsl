@@ -1,63 +1,57 @@
+<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
+
 # firearchwsl
 
-Automated bootstrap for an Arch Linux WSL2 environment: creates a non-root user, installs a curated toolchain, and lays down shell/terminal configs.
+## Purpose
 
-Author: Rogerio Junior. Script language is Portuguese (pt_BR); logs/prompts speak to the user in Portuguese.
+Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh Arch WSL distro, creates a non-root user, configures locale/git/mise, installs a curated pacman + AUR + mise toolchain, and lays down shell (bash, fish) and terminal (starship, zellij, yazi, lazygit, etc.) configs. User-facing output is in Portuguese (pt_BR). Author: Rogerio Junior.
 
-## Entry point
+## Key Files
 
-`install.sh` is the single orchestrator. It runs as root on a fresh Arch WSL distro and sequences every subscript with `source` so all exports/functions stay in one process. It sets `set -eE` and installs an `ERR` trap from `install/preflights/trap-errors.sh` so any failure prints the failing command and suggests rerunning.
+| File | Description |
+|------|-------------|
+| `install.sh` | Top-level orchestrator. `set -eE`, sources every preflight / pkg / config script in fixed order. Finishes with a `tte` animation of `logo.txt` and prompts the user to `wsl --terminate archlinux`. |
+| `logo.txt` | ASCII banner ("FIREARCHWSL") rendered by `tte` (python-terminaltexteffects) on install completion. |
 
-Run order (do not reshuffle without understanding dependencies):
+## Subdirectories
 
-1. `pacman -Syu` — initial sync.
-2. Preparation phase:
-   - `install/preflights/trap-errors.sh` — error trap.
-   - `system/create_your_user.sh` — interactive new user + sudoers.
-   - `system/configure_locale.sh` — pt_BR.UTF-8 / en_US.UTF-8 locales.
-   - `system/wsl_config.sh` — `libedit.so.2` symlink (OpenGL).
-   - `install/preflights/essentials_pkgs.sh` — minimum tools needed before anything else runs.
-   - `system/configure_git_user.sh` — prompts for git name/email and sets aliases.
-   - `install/preflights/repositories.sh` — pacman cosmetics + Omarchy + Chaotic-AUR.
-   - `install/preflights/install-mise.sh` — installs mise and wires shell activation.
-3. Packaging phase:
-   - `install/pkgs/good-tools.sh` — core CLI utilities.
-   - `install/pkgs/tuis.sh` — terminal UI apps (lazygit, yazi, atuin, …).
-   - `install/pkgs/install_langs.sh` — languages via mise (python, node, bun, rust, go).
-   - `install/pkgs/editors.sh` — LazyVim + Doom Emacs.
-4. Config phase:
-   - `config/config.sh` — copies `config_files/` and `default/` into target user's home.
-   - `config/docker.sh` — Docker daemon, DNS and systemd unit wiring.
-5. Final phase — clears screen, animates `logo.txt` via `tte` (terminaltexteffects), prints a message telling the user to `wsl --terminate archlinux`.
+| Directory | Purpose |
+|-----------|---------|
+| `install/` | Preflight steps and package groups (see `install/AGENTS.md`) |
+| `system/` | System-level config: user, locale, git, WSL shims (see `system/AGENTS.md`) |
+| `config/` | Post-install config copiers + Docker daemon wiring (see `config/AGENTS.md`) |
+| `config_files/` | Verbatim config payloads (starship.toml) (see `config_files/AGENTS.md`) |
+| `default/` | Default bash / fish rc files (see `default/AGENTS.md`) |
 
-## Layout
+## For AI Agents
 
-```
-firearchwsl/
-├─ install.sh              # top-level orchestrator (run as root)
-├─ logo.txt                # ASCII banner rendered by tte on finish
-├─ install/
-│  ├─ preflights/          # bootstrap steps that must run before packaging
-│  └─ pkgs/                # package groups installed via pacman / mise
-├─ system/                 # system-level configuration (user, locale, git, wsl)
-├─ config/                 # post-install configuration copiers
-├─ config_files/           # verbatim config payloads (e.g. starship.toml)
-└─ default/                # default shell rc files (bashrc, config.fish)
-```
+### Working In This Directory
 
-Each subdirectory has its own `AGENTS.md` with per-file notes.
+- `install.sh` must remain runnable from the repo root — subscripts use relative paths (`./install`, `./system`, `./config`, and `config/config.sh` uses `../config_files`, `../default`). Do not change CWD mid-run.
+- Script order in `install.sh` is load-bearing. Summary: `pacman -Syu` → trap → user → locale → wsl → essentials → git-user → repositories → mise → good-tools → tuis → langs → editors → config → docker. Do not reshuffle without understanding each dependency.
+- User-facing strings (`echo`, `printf`, `read -rp`) are Portuguese. Preserve that tone.
+- Scripts are `#!/bin/bash`. New scripts should start with `set -Eeuo pipefail`; `install.sh` itself uses `set -eE` so the `ERR` trap fires.
+- Log helpers `msg` (green) / `warn` (yellow) / `die` (red) are duplicated across files on purpose so each is self-sourceable.
 
-## Conventions
+### Testing Requirements
 
-- **Shell**: all scripts are `#!/bin/bash`. Prefer `set -Eeuo pipefail` in new scripts (as in `good-tools.sh`, `tuis.sh`, `essentials_pkgs.sh`). `install.sh` itself uses `set -eE` so the `ERR` trap fires.
-- **Language**: user-facing `echo`/`printf` strings are Portuguese. Keep that tone in new additions.
-- **Logging helpers**: reuse the `msg` / `warn` / `die` trio (green/yellow/red ANSI). Duplicated across scripts by design — each script is sourceable and self-contained.
-- **Privilege**: most scripts assume root (run via `install.sh`). Scripts that refuse to run outside root guard with `if [[ $EUID -ne 0 ]]`. `config.sh` detects the target non-root user by reading the `wheel` group.
-- **Idempotency**: `pacman -S --needed --noconfirm`, `mkdir -p`, `grep -q` guards, and `if [[ ! -d ... ]]` checks are the pattern. New steps should follow suit so reruns don't break.
-- **Package lists**: each `install/pkgs/*.sh` keeps its own `PACMAN_PKGS=()` array. Group by intent (CLI utilities vs TUIs), don't consolidate.
-- **Path assumptions**: `install.sh` uses relative paths (`./install`, `./system`, `./config`). Run from repo root. `config/config.sh` uses `../config_files` and `../default`, so it expects to be sourced while CWD is the repo root.
+- No tests, no CI, no lint config. Validation is: spin up a fresh Arch WSL distro and re-run `install.sh`. Scripts are designed to be idempotent (`--needed`, `mkdir -p`, `grep -q` guards, `[[ ! -d ... ]]`) — reruns should be safe.
 
-## Not in this repo
+### Common Patterns
 
-- `install.sh` is invoked against a fresh Arch WSL image; it does not install the WSL distro itself.
-- There are no tests, no CI, and no lint config. Changes are verified by re-running `install.sh` in a throwaway WSL distro.
+- `PACMAN_PKGS=()` arrays grouped by intent (one per pkg file). Do not consolidate across groups.
+- Idempotency checks before mutating `/etc` (e.g. `grep -q "chaotic-aur" /etc/pacman.conf`).
+- Root-required scripts guard with `if [[ $EUID -ne 0 ]]`.
+- Interactive `read -rp` for values that must come from the human (username, git name/email).
+
+## Dependencies
+
+### External
+
+- `pacman` — base Arch package manager.
+- Omarchy repo (`https://pkgs.omarchy.org/`) and Chaotic-AUR — extra package sources added by `install/preflights/repositories.sh`.
+- `mise` — polyglot language version manager (python, node, bun, rust, go).
+- `tte` (python-terminaltexteffects) — renders the finale banner.
+- LazyVim starter and doomemacs — cloned by `install/pkgs/editors.sh`.
+
+<!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->

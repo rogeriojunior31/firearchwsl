@@ -1,21 +1,46 @@
-# install/preflights/
+<!-- Parent: ../AGENTS.md -->
+<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
 
-Steps that prepare the system before any opinionated packages land. All are sourced by `install.sh` while running as root.
+# preflights
 
-## Files
+## Purpose
 
-- `trap-errors.sh` — defines `catch_errors` and wires it to the `ERR` trap. Prints the failing command and suggests `bash ./install.sh`. Source this first; every later script benefits from it.
-- `essentials_pkgs.sh` — tiny `PACMAN_PKGS=()` of hard prerequisites (`sudo`, `base-devel`, `git`, `fish`, `btop`, `curl`, `wget`, `just`, `make`, `eza`, `bat`, `openssh`, `vim`). Gate further scripts on this running successfully.
-- `repositories.sh` — edits `/etc/pacman.conf`:
-  - Enables `Color`, `ILoveCandy`, `VerbosePkgLists`.
-  - Adds the Omarchy repo (`https://pkgs.omarchy.org/`) with `SigLevel = Optional TrustAll`.
-  - Overwrites `/etc/pacman.d/mirrorlist` with two global mirrors (`geo.mirror.pkgbuild.com`, `mirror.rackspace.com`).
-  - On `x86_64`, adds Chaotic-AUR (key `3056513887B78AEB`, keyring + mirrorlist packages). Skippable via `DISABLE_CHAOTIC=1`.
-  - Finishes with `pacman -Syu --noconfirm`.
-- `install-mise.sh` — `pacman -S mise`, then appends the right `mise activate` line to the invoker's shell rc (`.bashrc`, `.zshrc`, or `~/.config/fish/config.fish`). Uses `$SHELL` to pick; falls back to bash. Idempotent via `grep -Fq`.
+Steps that prepare the system before any opinionated packages land. Sourced by `install.sh` while running as root, in the order listed in Key Files.
 
-## Conventions here
+## Key Files
 
-- These scripts assume root (sourced from `install.sh`, which runs as root). They call `sudo` anyway so they can also be run standalone.
+| File | Description |
+|------|-------------|
+| `trap-errors.sh` | Defines `catch_errors` and wires it to the `ERR` trap. Prints the failing command and suggests `bash ./install.sh`. Source first — every later script benefits. |
+| `essentials_pkgs.sh` | Minimal `PACMAN_PKGS=()`: `sudo`, `base-devel`, `git`, `fish`, `btop`, `curl`, `wget`, `just`, `make`, `eza`, `bat`, `openssh`, `vim`. Gate further scripts on this succeeding. |
+| `repositories.sh` | Edits `/etc/pacman.conf`: enables `Color`, `ILoveCandy`, `VerbosePkgLists`; adds Omarchy repo (`SigLevel = Optional TrustAll`); overwrites `/etc/pacman.d/mirrorlist` with two global mirrors; on `x86_64` installs Chaotic-AUR (key `3056513887B78AEB`, keyring + mirrorlist pkgs — skippable via `DISABLE_CHAOTIC`). Ends with `pacman -Syu`. |
+| `install-mise.sh` | `pacman -S mise`, then appends the right `mise activate` line to the invoker's shell rc (bash/zsh/fish detected from `$SHELL`; fallback bash). Idempotent via `grep -Fq`. |
+
+## For AI Agents
+
+### Working In This Directory
+
+- Scripts assume root (sourced from `install.sh`, which runs as root). They still call `sudo` so they can also be run standalone.
 - Any edit to `/etc/pacman.conf` MUST be guarded with `grep -q` — the file is rewritten in place on every run.
-- The Chaotic-AUR opt-out env var (`DISABLE_CHAOTIC`) is the pattern for conditional sections; reuse it for similar toggles.
+- Use the `DISABLE_CHAOTIC` env-var pattern for conditional sections; reuse it for similar toggles.
+
+### Testing Requirements
+
+- Rerun on an already-configured distro: `/etc/pacman.conf` should remain unchanged, mise activation line should not duplicate in the rc file.
+
+### Common Patterns
+
+- `set -euo pipefail` + ANSI `msg`/`err` helpers.
+- `command -v sudo >/dev/null 2>&1` guards before calling sudo-dependent commands.
+
+## Dependencies
+
+### Internal
+
+- Sourced by `../../install.sh` in the preparation phase.
+
+### External
+
+- `pacman`, `sudo`, `pacman-key`, `mise`.
+
+<!-- MANUAL: -->
