@@ -86,6 +86,15 @@ for catalog in install/i18n/*.sh; do
   [[ -n "$only_en$only_here$wrong_args" ]] || pass "$name: same keys and placeholders as en.sh"
 done
 
+echo "bootstrap.ps1"
+# `irm | iex` turns a BOM into a stray U+FEFF that breaks parsing, and
+# Windows PowerShell 5.1 reads BOM-less non-ASCII as ANSI: ASCII only.
+if LC_ALL=C grep -q '[^[:print:][:space:]]' bootstrap.ps1; then
+  fail "bootstrap.ps1 must be pure ASCII without BOM (write accents as \\uXXXX)"
+else
+  pass "bootstrap.ps1 is pure ASCII"
+fi
+
 echo "line endings"
 crlf="$(git ls-files --eol 2>/dev/null | awk '$2 ~ /crlf/ { print $NF }')"
 if [[ -z "$crlf" ]]; then pass "LF everywhere"; else fail "CRLF in: $(tr '\n' ' ' <<<"$crlf")"; fi

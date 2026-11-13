@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Installs an Arch Linux WSL distro (if needed) and runs firearchwsl inside it.
 
@@ -50,6 +50,10 @@ $env:WSL_UTF8 = '1'
 ## Messages ###################################################################
 # The installer itself is fully translated; these are only the few lines the
 # bootstrap prints before it starts.
+# This file must stay pure ASCII without a BOM: `irm | iex` keeps a BOM as a
+# U+FEFF character that breaks parsing, and Windows PowerShell 5.1 reads a
+# BOM-less file as ANSI. Non-ASCII characters are written as \uXXXX escapes
+# and decoded by Msg.
 $lang = $env:FIREARCH_LANG
 if (-not $lang) { if ((Get-Culture).Name -like 'pt*') { $lang = 'pt_BR' } else { $lang = 'en' } }
 $messages = @{
@@ -57,34 +61,34 @@ $messages = @{
     noWsl      = 'WSL is not available. Install it first (as administrator):  wsl --install --no-distribution'
     installing = 'Installing the Arch Linux distro as "{0}"...'
     installFail = 'Could not install the distro (wsl --install exit {0}).'
-    exists     = 'Distro "{0}" already exists — using it.'
+    exists     = 'Distro "{0}" already exists \u2014 using it.'
     fetching   = 'Fetching firearchwsl into /opt/firearchwsl...'
     fetchFail  = 'Could not fetch firearchwsl (exit {0}).'
     running    = 'Starting the installer...'
-    runFail    = 'The installer stopped (exit {0}). Fix the problem and run this script again — it is safe to re-run.'
+    runFail    = 'The installer stopped (exit {0}). Fix the problem and run this script again \u2014 it is safe to re-run.'
     restarting = 'Restarting the distro so the new settings apply...'
     done       = 'Done! Open your new environment with:'
   }
   pt_BR = @{
-    noWsl      = 'O WSL não está disponível. Instale primeiro (como administrador):  wsl --install --no-distribution'
+    noWsl      = 'O WSL n\u00e3o est\u00e1 dispon\u00edvel. Instale primeiro (como administrador):  wsl --install --no-distribution'
     installing = 'Instalando a distro Arch Linux como "{0}"...'
-    installFail = 'Não foi possível instalar a distro (wsl --install saiu com {0}).'
-    exists     = 'A distro "{0}" já existe — usando ela.'
+    installFail = 'N\u00e3o foi poss\u00edvel instalar a distro (wsl --install saiu com {0}).'
+    exists     = 'A distro "{0}" j\u00e1 existe \u2014 usando ela.'
     fetching   = 'Baixando o firearchwsl para /opt/firearchwsl...'
-    fetchFail  = 'Não foi possível baixar o firearchwsl (saída {0}).'
+    fetchFail  = 'N\u00e3o foi poss\u00edvel baixar o firearchwsl (sa\u00edda {0}).'
     running    = 'Iniciando o instalador...'
-    runFail    = 'O instalador parou (saída {0}). Corrija o problema e rode este script de novo — é seguro repetir.'
-    restarting = 'Reiniciando a distro para as novas configurações valerem...'
+    runFail    = 'O instalador parou (sa\u00edda {0}). Corrija o problema e rode este script de novo \u2014 \u00e9 seguro repetir.'
+    restarting = 'Reiniciando a distro para as novas configura\u00e7\u00f5es valerem...'
     done       = 'Pronto! Abra o seu novo ambiente com:'
   }
 }
 if (-not $messages.ContainsKey($lang)) { $lang = 'en' }
+function Msg([string]$key, $arg) { [regex]::Unescape($messages[$lang][$key]) -f $arg }
 function Say([string]$key, $arg) {
-  $text = $messages[$lang][$key] -f $arg
-  Write-Host "  $([char]0x2022) $text" -ForegroundColor DarkYellow
+  Write-Host "  $([char]0x2022) $(Msg $key $arg)" -ForegroundColor DarkYellow
 }
 function Fail([string]$key, $arg) {
-  Write-Host "  $([char]0x2716) $($messages[$lang][$key] -f $arg)" -ForegroundColor Red
+  Write-Host "  $([char]0x2716) $(Msg $key $arg)" -ForegroundColor Red
   exit 1
 }
 
@@ -107,7 +111,7 @@ if ($distros -contains $Name) {
 
 ## 3. Fetch firearchwsl ########################################################
 # Parameters travel as environment variables through WSLENV (the /p flag
-# translates a Windows path), and the script itself as base64 — nothing is
+# translates a Windows path), and the script itself as base64 - nothing is
 # spliced into a command line, so quoting cannot break.
 $fetchScript = @'
 set -euo pipefail
