@@ -18,7 +18,9 @@ pass() { printf '  \e[32m✔\e[0m %s\n' "$*"; }
 fail() { printf '  \e[31m✖\e[0m %s\n' "$*"; failures=$((failures + 1)); }
 note() { printf '  \e[90m↷ %s\e[0m\n' "$*"; }
 
-mapfile -t scripts < <(git ls-files '*.sh' 2>/dev/null || find . -name '*.sh' -not -path './.git/*')
+# Every .sh plus the extensionless commands in bin/.
+mapfile -t scripts < <(git ls-files '*.sh' 'bin/*' 2>/dev/null ||
+  find . -type f \( -name '*.sh' -o -path './bin/*' \) -not -path './.git/*')
 
 echo "bash -n"
 bad=0
@@ -59,7 +61,7 @@ en_keys="$(catalog_keys install/i18n/en.sh)"
 # Keys referenced by the code: `t key` calls plus the step titles in STEPS.
 used="$(
   {
-    grep -rhoE '\bt "?[a-z_]+\.[a-z_0-9]+' --include='*.sh' . | sed -E 's/^t "?//'
+    grep -hoE '\bt "?[a-z_]+\.[a-z_0-9]+' "${scripts[@]}" | sed -E 's/^t "?//'
     grep -hoE '"step\.[a-z_]+\|' install.sh | tr -d '"|'
     echo usage
   } | sort -u

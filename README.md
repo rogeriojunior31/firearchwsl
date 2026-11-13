@@ -32,6 +32,7 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
 - [Idiomas (i18n)](#idiomas-i18n)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Pacotes instalados](#pacotes-instalados)
+- [Comando `firearch`](#comando-firearch)
 - [Re-execução](#re-execução)
 - [Estendendo](#estendendo)
 - [Validação](#validação)
@@ -49,22 +50,25 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
   │  Git ............. Fulano <fulano@exemplo.com>
   │  Hostname ........ meuarch
   │  Shell padrão .... fish
-  │  Linguagens ...... sim
+  │  Perfil .......... dev
+  │  TUIs ............ sim
+  │  Linguagens ...... sim (python node bun rust go)
   │  LazyVim ......... sim
   │  Doom Emacs ...... não
   │  Docker .......... sim
   ╰─
 
-━━ [02/14] Usuário e sudo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━ [02/14] Usuário e sudo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ▱▱▱▱▱▱▱▱▱▱   7% · 1m04s
   ✔ Instalando sudo (2s)
   ✔ Criando usuário 'fulano' (grupo wheel) (0s)
   ✔ Senha definida para 'fulano'.
   ✔ sudo liberado para o grupo wheel.
 
-━━ [09/14] Ferramentas de linha de comando ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━ [09/14] Ferramentas de linha de comando ━━━━━━━━━━━━━━━━ ▰▰▰▰▰▱▱▱▱▱  57% · 2m31s
   ⠹ Instalando CLIs e fontes (35 pacotes) (41s) downloading starship...
 ```
 
+- **Progresso geral** no cabeçalho de cada etapa (barra, % e tempo decorrido), no título da aba e no anel de progresso da aba/barra de tarefas do Windows Terminal (fica vermelho se algo falhar).
 - **Spinner** com tempo decorrido e a última linha do log ao lado.
 - **✔ / ⚠ / ↷ / ✖** para feito, aviso, pulado e erro.
 - Em caso de erro: etapa, comando, as últimas linhas do log e como retomar.
@@ -80,6 +84,7 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
 - Repositórios **Omarchy** e **Chaotic-AUR** ativos.
 - **mise** com Python, Node, Bun, Rust e Go em `latest` *(opcional)*.
 - **Shells**: `bash` e `fish` prontos (PATH, aliases, histórico, `starship`/`zoxide`/`atuin`/`mise`/`fzf`). Você escolhe qual é o padrão.
+- Pastas `~/Projects`, `~/Work` e `~/Notes` já criadas na sua home (`FIREARCH_HOME_DIRS` muda a lista).
 - **Prompt**: `starship` com nerd-font e paleta `tokyonight`.
 - **Editores**: **LazyVim** e **Doom Emacs** *(opcionais)*.
 - **TUIs**: `lazygit`, `lazydocker`, `yazi` (com previews), `zellij`, `taskwarrior-tui`, `tabiew`, `television`, `navi`, `superfile`, `atuin`, `fzf`.
@@ -109,7 +114,9 @@ No **PowerShell**:
 irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1 | iex
 ```
 
-O `bootstrap.ps1` instala a distro oficial do Arch (se você ainda não tiver), baixa o firearchwsl para `/opt/firearchwsl` dentro dela, roda o instalador e reinicia a distro no final. Rodar de novo é seguro.
+O `bootstrap.ps1` instala a distro oficial do Arch (se você ainda não tiver), baixa o firearchwsl para `/opt/firearchwsl` dentro dela e roda o instalador. Depois ele instala a **CaskaydiaMono Nerd Font** no seu usuário do Windows, cria o perfil **FireArch** no Windows Terminal (fonte + tema Tokyo Night + ícone 🔥) e reinicia a distro. Nada disso pede administrador, e rodar de novo é seguro.
+
+O perfil é um *fragment* do Windows Terminal (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\firearchwsl\`): o seu `settings.json` não é tocado. Para usá-lo como padrão, escolha **FireArch** em *Configurações → Inicialização → Perfil padrão*.
 
 Com opções:
 
@@ -124,6 +131,8 @@ Com opções:
 | `-Source <caminho>` | Copia um checkout local em vez de clonar |
 | `-Yes` | Pula a confirmação final do instalador |
 | `-VerboseInstall` | Saída crua dos comandos, sem spinner |
+| `-NoFont` | Não instala a Nerd Font (ou `$env:FIREARCH_NO_FONT = '1'`) |
+| `-NoTerminal` | Não cria o perfil do Windows Terminal (ou `$env:FIREARCH_NO_TERMINAL = '1'`) |
 
 As variáveis `FIREARCH_*` definidas no PowerShell (`$env:FIREARCH_USER = '...'`) são repassadas para dentro do WSL.
 
@@ -148,7 +157,11 @@ O instalador pergunta, tudo de uma vez:
 4. **Nome** e **email** do Git (pode deixar vazio para pular).
 5. **Hostname** da distro. Enter mantém o nome da máquina Windows.
 6. **Shell padrão**: `bash` ou `fish`.
-7. **Componentes opcionais**: linguagens, LazyVim, Doom Emacs, Docker.
+7. **Perfil de instalação**:
+   - `minimal`: só CLIs, shells e prompt (o mais rápido);
+   - `dev` *(padrão)*: tudo menos o Doom Emacs;
+   - `full`: tudo, com Doom Emacs (+5 a 15 min);
+   - `custom`: você escolhe cada componente (TUIs, linguagens, LazyVim, Doom Emacs, Docker) e cada linguagem (Python, Node, Bun, Rust, Go).
 
 Depois ele mostra o resumo e pede confirmação:
 
@@ -174,9 +187,11 @@ Toda pergunta tem uma variável de ambiente equivalente. Com elas e `--yes`, nad
 FIREARCH_LANG=pt_BR \
 FIREARCH_USER=fulano FIREARCH_PASSWORD='s3nha' \
 FIREARCH_GIT_NAME='Fulano' FIREARCH_GIT_EMAIL='fulano@exemplo.com' \
-FIREARCH_SHELL=fish FIREARCH_SKIP=doom \
+FIREARCH_SHELL=fish FIREARCH_PROFILE=minimal \
 bash install.sh --yes
 ```
+
+`FIREARCH_PROFILE` escolhe o perfil; `FIREARCH_SKIP` (`tuis,langs,lazyvim,doom,docker`) escolhe componente por componente e tem prioridade. Sem nenhuma das duas, o modo não-interativo usa o perfil `dev`.
 
 Sem terminal (CI, `wsl -- bash install.sh` capturado), o spinner é desligado e cada comando vira uma linha `✔`/`✖`.
 
@@ -202,8 +217,10 @@ Os prompts leem direto do terminal (`/dev/tty`), então continuam funcionando me
 | `FIREARCH_GIT_NAME` / `FIREARCH_GIT_EMAIL` | Identidade do Git |
 | `FIREARCH_HOSTNAME` | Hostname da distro. Default: o nome da máquina Windows |
 | `FIREARCH_SHELL` | Shell padrão: `bash` (default) ou `fish` |
-| `FIREARCH_SKIP` | Componentes a pular: `langs`, `lazyvim`, `doom`, `docker` (separe por vírgula) |
+| `FIREARCH_PROFILE` | Perfil: `minimal`, `dev` (default), `full` ou `custom` |
+| `FIREARCH_SKIP` | Componentes a pular: `tuis`, `langs`, `lazyvim`, `doom`, `docker` (separe por vírgula). Se definida, o perfil não é perguntado |
 | `FIREARCH_MISE_TOOLS` | Toolchains do mise. Default: `python node bun rust go` |
+| `FIREARCH_HOME_DIRS` | Pastas criadas na home. Default: `Projects Work Notes` (`""` não cria nenhuma) |
 | `FIREARCH_VERBOSE=1` | Igual a `--verbose` |
 | `FIREARCH_LOG` | Caminho do log. Default: `/var/log/firearchwsl/install-<data>.log` |
 | `FORCE_CONFIG=1` | Sobrescreve `~/.bashrc` e `config.fish` (com backup `.bak-<data>`) |
@@ -229,10 +246,10 @@ O `install.sh` é um orquestrador que dá `source` em cada script. **A ordem imp
 | 7 | Repositórios | `install/preflights/repositories.sh` | Mirrors (com backup), Chaotic-AUR, Omarchy por último, `pacman -Syu` |
 | 8 | mise | `install/preflights/install-mise.sh` | Instala o `mise` |
 | 9 | CLIs | `install/pkgs/good-tools.sh` | CLIs, fontes, `yay`/`paru` |
-| 10 | TUIs | `install/pkgs/tuis.sh` | TUIs e previews do yazi |
+| 10 | TUIs | `install/pkgs/tuis.sh` | TUIs e previews do yazi *(opcional)* |
 | 11 | Linguagens | `install/pkgs/install_langs.sh` | `mise use -g <tool>@latest` *(opcional)* |
 | 12 | Editores | `install/pkgs/editors.sh` | LazyVim e Doom Emacs *(opcionais)* |
-| 13 | Configs | `config/config.sh` | rc files, starship, shell padrão |
+| 13 | Configs | `config/config.sh` | rc files, starship, pastas `~/Projects`, `~/Work`, `~/Notes`, comando `firearch`, shell padrão |
 | 14 | Docker | `config/docker.sh` | Pacotes, `daemon.json`, grupo, serviço *(opcional)* |
 | ∎ | Final | `install/preflights/finale.sh` | Logo animado (`tte`), resumo, próximos passos |
 
@@ -272,6 +289,7 @@ Pronto: o seletor de idioma e `FIREARCH_LANG=<codigo>` passam a aceitar o novo i
 firearchwsl/
 ├── bootstrap.ps1              # Windows: instala a distro e roda o instalador
 ├── install.sh                 # Orquestrador: sempre o ponto de entrada no Linux
+├── bin/firearch              # Comando do dia a dia: update, doctor, setup, logs
 ├── logo.txt                   # Banner ASCII
 ├── tests/                     # check.sh (estático) e container.sh (ponta a ponta)
 ├── .github/workflows/ci.yml   # CI: os dois testes acima
@@ -318,6 +336,22 @@ Um pacote que sumiu dos repositórios não derruba mais o grupo inteiro: ele é 
 ### mise e o home do Windows
 
 O WSL abre em `/mnt/c/Users/<você>`, e o mise procura configs subindo a partir da pasta atual: sem ajuste, ele leria o `~/.config/mise` do **Windows** e listaria aquelas ferramentas como `missing`. O instalador cria `~/.config/mise/miserc.toml` ignorando só essa pasta; o `mise.toml` dos seus projetos em `/mnt/c` continua valendo.
+
+---
+
+## Comando `firearch`
+
+Depois da instalação, o comando `firearch` fica disponível para o seu usuário. Sem argumentos ele abre um menu:
+
+| Comando | O que faz |
+|---------|-----------|
+| `firearch update` | `pacman -Syu`, `mise upgrade` e atualiza o próprio firearchwsl (`/opt/firearchwsl`) |
+| `firearch doctor` | Verifica WSL, systemd, usuário padrão, sudo, integração com o Windows, DNS, locale, espaço em disco, mise e Docker. Cada problema vem com a correção |
+| `firearch setup` | Roda o instalador de novo (refaz as perguntas) |
+| `firearch logs` | Abre o último log do instalador |
+| `firearch version` | Mostra a versão instalada |
+
+Ele fala o idioma escolhido na instalação (gravado em `/etc/firearchwsl/lang`; `FIREARCH_LANG` troca).
 
 ---
 
@@ -391,7 +425,8 @@ Teste no WSL de verdade, sem mexer na sua distro: `.\bootstrap.ps1 -Name firearc
 | Hostname novo não aparece | O WSL só aplica no próximo start | `wsl --terminate archlinux` |
 | WSL ainda abre como root | A distro não foi reiniciada | `wsl --terminate archlinux` no PowerShell |
 | `docker` exige `sudo` | O grupo `docker` só vale após novo login | `wsl --terminate archlinux` |
-| Ícones do prompt aparecem como quadrados | Terminal sem Nerd Font | Configure uma Nerd Font no Windows Terminal |
+| Ícones do prompt aparecem como quadrados | Terminal sem Nerd Font | Use o perfil **FireArch** do Windows Terminal (o bootstrap instala a fonte), ou escolha uma Nerd Font no seu perfil |
+| Algo estranho e não sei o quê | — | `firearch doctor` |
 | Doom Emacs com erro | Download interrompido | `~/.emacs.d/bin/doom doctor` e `doom sync` |
 | Quero ver tudo que aconteceu | — | `less /var/log/firearchwsl/install-*.log` |
 

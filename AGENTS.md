@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh Arch WSL distro: asks everything up front (language, user, git identity, shell, optional components), then runs unattended — creates the non-root user, configures locale/WSL/git, installs a curated pacman + Chaotic-AUR + mise toolchain, and lays down shell (bash, fish) and terminal configs. The installer UI is multilingual (`pt_BR`, `en`). Author: Rogerio Junior.
+Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh Arch WSL distro: asks everything up front (language, user, git identity, shell, install profile), then runs unattended — creates the non-root user, configures locale/WSL/git, installs a curated pacman + Chaotic-AUR + mise toolchain, and lays down shell (bash, fish) and terminal configs. The installer UI is multilingual (`pt_BR`, `en`). Author: Rogerio Junior.
 
 ## Key Files
 
@@ -10,9 +10,10 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 |------|-------------|
 | `install.sh` | Orchestrator and only entry point. `set -Eeuo pipefail`. Loads `lib.sh`, picks the language, runs step 1 (base sync), sources `wizard.sh`, then sources every step script from the `STEPS` array in fixed order, then `finale.sh`. |
 | `logo.txt` | ASCII banner. Printed with a color gradient at start; animated by `tte` at the end. |
-| `bootstrap.ps1` | Windows entry point. Installs the Arch distro (`wsl --install archlinux --name`), fetches the repo into `/opt/firearchwsl` (git clone, or `-Source` local copy), runs `install.sh` as root, restarts the distro. Must stay compatible with Windows PowerShell 5.1 (no `??`, no ternary) and **pure ASCII without a BOM**: `irm | iex` keeps a BOM as a stray U+FEFF that breaks parsing, and 5.1 reads BOM-less non-ASCII as ANSI. Accents go in as `\uXXXX` and are decoded by `Msg` (`[regex]::Unescape`). `tests/check.sh` enforces it. Distro/repo/branch can also come from `FIREARCH_DISTRO`/`FIREARCH_REPO`/`FIREARCH_BRANCH`, since `irm | iex` cannot pass parameters. |
+| `bootstrap.ps1` | Windows entry point. Installs the Arch distro (`wsl --install archlinux --name`), fetches the repo into `/opt/firearchwsl` (git clone, or `-Source` local copy), runs `install.sh` as root, installs CaskaydiaMono Nerd Font per user (HKCU + `%LOCALAPPDATA%\Microsoft\Windows\Fonts`; the 3.5 MB `.tar.xz` through the built-in `tar.exe` when it has liblzma, else the 56 MB `.zip`) and writes a Windows Terminal JSON fragment (`Fragments\firearchwsl\<distro>.json`: profile + Tokyo Night scheme; never edits `settings.json`), then restarts the distro. `-NoFont` / `-NoTerminal` (or `FIREARCH_NO_FONT` / `FIREARCH_NO_TERMINAL`) skip those. Must stay compatible with Windows PowerShell 5.1 (no `??`, no ternary) and **pure ASCII without a BOM**: `irm | iex` keeps a BOM as a stray U+FEFF that breaks parsing, and 5.1 reads BOM-less non-ASCII as ANSI. Accents go in as `\uXXXX` and are decoded by `Msg` (`[regex]::Unescape`). `tests/check.sh` enforces it. Distro/repo/branch can also come from `FIREARCH_DISTRO`/`FIREARCH_REPO`/`FIREARCH_BRANCH`, since `irm | iex` cannot pass parameters. |
 | `README.md` / `README.en.md` | User documentation (Portuguese / English). Keep both in sync. |
-| `tests/check.sh` | Static checks: `bash -n`, shellcheck, `fish -n`, i18n key/placeholder parity, LF endings. |
+| `bin/firearch` | Post-install command, symlinked to `/usr/local/bin/firearch` by `config/config.sh`: `update` (pacman -Syu, mise upgrade, shallow fetch of the checkout), `doctor` (WSL health checks, each with its fix), `setup` (re-runs `install.sh`), `logs`, `version`, and a menu without arguments. Runs as the user; sources `lib.sh` for `t`/UI; language from `/etc/firearchwsl/lang`. Same rules as the step scripts: English code, every string through `t`. |
+| `tests/check.sh` | Static checks (every `*.sh` plus `bin/*`): `bash -n`, shellcheck, `fish -n`, i18n key/placeholder parity, LF endings. |
 | `tests/container.sh` | End-to-end: installer twice in a clean `archlinux` container + assertions. `--inside` is what CI runs. |
 | `.github/workflows/ci.yml` | Runs both tests on push to `main`, PRs and manual dispatch. |
 | `.shellcheckrc` | `external-sources=true`, `SC2034` off (globals are shared across sourced files). |
@@ -46,7 +47,8 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 - `TARGET_USER` / `TARGET_HOME` are exported by `system/create_your_user.sh`. Single source of truth on re-runs: `/etc/firearchwsl/target_user`.
 - User-scoped commands use `as_user <cmd>` (from `lib.sh`); never `$HOME`/`$USER` (those are root's).
 - Non-fatal steps: `run … || warn "$(t …)"`. Warnings are collected and repeated in the final summary. Fatal: let the `ERR` trap fire (it prints step, command and log tail).
-- Optional components (`langs`, `lazyvim`, `doom`, `docker`) are gated by `component_enabled <name>`, driven by `FIREARCH_SKIP`.
+- Optional components (`tuis`, `langs`, `lazyvim`, `doom`, `docker`) are gated by `component_enabled <name>`, driven by `FIREARCH_SKIP`. The wizard derives `FIREARCH_SKIP` from the profile (`WIZARD_PROFILE_SKIP` in `wizard.sh`: `minimal`, `dev` = default, `full`); `custom` asks per component and per language (`FIREARCH_MISE_TOOLS`). A preset `FIREARCH_SKIP` wins over any profile.
+- `step` prints the overall progress and emits OSC 0 (tab title) and OSC 9;4 (Windows Terminal progress ring); `ui_init`'s EXIT trap clears the ring on success and turns it red on failure.
 - No rollback: a mid-run failure leaves partial state. Every step must be idempotent so a re-run is safe.
 
 ### Testing Requirements

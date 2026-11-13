@@ -53,8 +53,10 @@ Variáveis de ambiente (todas opcionais no modo interativo):
   FIREARCH_GIT_EMAIL   git config user.email
   FIREARCH_HOSTNAME    hostname da distro (default: nome da máquina Windows)
   FIREARCH_SHELL       shell padrão: bash (default) ou fish
-  FIREARCH_SKIP        componentes a pular: langs,lazyvim,doom,docker
+  FIREARCH_PROFILE     minimal, dev (padrão), full ou custom
+  FIREARCH_SKIP        componentes a pular: tuis,langs,lazyvim,doom,docker
   FIREARCH_MISE_TOOLS  toolchains do mise (default: \"python node bun rust go\")
+  FIREARCH_HOME_DIRS   pastas criadas na home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   igual a --verbose
   FIREARCH_NO_GUM=1    prompts simples em vez do gum
   FIREARCH_LOG         caminho do arquivo de log
@@ -120,6 +122,15 @@ MSG[wiz.comp_langs]="Python · Node · Bun · Rust · Go via mise"
 MSG[wiz.comp_lazyvim]="Neovim com LazyVim"
 MSG[wiz.comp_doom]="Doom Emacs (demora 5 a 15 min)"
 MSG[wiz.comp_docker]="Docker + buildx + compose"
+MSG[wiz.profile_q]="Perfil de instalação"
+MSG[wiz.profile_minimal]="Só CLIs, shells e prompt (mais rápido)"
+MSG[wiz.profile_dev]="Tudo menos o Doom Emacs (recomendado)"
+MSG[wiz.profile_full]="Tudo, com Doom Emacs (+5 a 15 min)"
+MSG[wiz.profile_custom]="Escolher componentes e linguagens um a um"
+MSG[wiz.comp_tuis]="TUIs: lazygit, lazydocker, yazi, atuin, fzf…"
+MSG[wiz.langs_q]="Linguagens via mise"
+MSG[wiz.sum_profile]="Perfil"
+MSG[wiz.sum_tuis]="TUIs"
 MSG[wiz.sum_title]="Resumo da instalação"
 MSG[wiz.sum_user]="Usuário"
 MSG[wiz.sum_password]="Senha"
@@ -165,6 +176,7 @@ MSG[wsl.no_interop]="Interop com o Windows indisponível — o mise pode ler tam
 ## Packages
 MSG[ess.install]="Instalando essenciais"
 MSG[tools.install]="Instalando CLIs e fontes"
+MSG[tuis.skip]="TUIs puladas (componente desativado)."
 MSG[tuis.install]="Instalando TUIs e previews do yazi"
 MSG[mise.install]="Instalando mise"
 
@@ -210,6 +222,9 @@ MSG[cfg.rc_updated]="%s atualizado para o novo padrão (não tinha edições loc
 MSG[cfg.rc_overwritten]="%s sobrescrito (backup: %s)."
 MSG[cfg.rc_preserved]="%s tem edições locais — preservado (FORCE_CONFIG=1 sobrescreve com backup)."
 MSG[cfg.starship]="Starship apontando para o tema do firearchwsl."
+MSG[cfg.cli]="Comando firearch instalado: update, doctor, setup, logs."
+MSG[cfg.home_dirs]="Pastas na sua home: %s."
+MSG[cfg.home_dir_invalid]="Pulando a pasta %s — use um nome relativo à home."
 MSG[cfg.shell_missing]="Shell %s não encontrado — mantendo o shell atual."
 MSG[cfg.shell_already]="Shell padrão já é %s."
 MSG[cfg.shell_set]="Definindo %s como shell padrão"
@@ -236,4 +251,64 @@ MSG[fin.warn_header]="Avisos desta execução:"
 MSG[fin.next]="Próximos passos"
 MSG[fin.step1]="No PowerShell do Windows, reinicie a distro:"
 MSG[fin.step2]="Abra de novo com %s — você já entra como %s."
-MSG[fin.step3]="Use uma Nerd Font no terminal do Windows para ver os ícones do prompt."
+MSG[fin.step3]="Digite %s quando quiser para o menu: atualizar, diagnosticar, reconfigurar."
+MSG[fin.step4]="Use uma Nerd Font no terminal do Windows para ver os ícones do prompt."
+
+## Comando firearch (bin/firearch)
+MSG[cli.usage]="firearch — o companheiro do seu firearchwsl
+
+Uso:
+  firearch            menu
+  firearch update     pacotes do sistema, ferramentas do mise e o próprio firearchwsl
+  firearch doctor     verifica o ambiente WSL
+  firearch setup      roda o instalador de novo (refaz as perguntas)
+  firearch logs       abre o último log do instalador
+  firearch version    mostra a versão do firearchwsl"
+MSG[cli.menu_q]="O que você quer fazer?"
+MSG[cli.menu_doctor]="verificar o ambiente"
+MSG[cli.menu_update]="atualizar pacotes, ferramentas e o firearchwsl"
+MSG[cli.menu_setup]="rodar o instalador de novo"
+MSG[cli.menu_logs]="abrir o último log do instalador"
+MSG[cli.menu_quit]="sair"
+MSG[cli.sudo_fail]="Este comando precisa de sudo."
+MSG[cli.update_title]="Atualização"
+MSG[cli.update_pkgs]="Atualizando os pacotes do sistema"
+MSG[cli.update_pkgs_fail]="pacman -Syu falhou — veja a saída de: sudo pacman -Syu"
+MSG[cli.update_mise]="Atualizando as ferramentas do mise"
+MSG[cli.update_mise_fail]="mise upgrade falhou — rode à mão para ver o motivo."
+MSG[cli.update_no_git]="%s não é um checkout git — o firearchwsl em si não foi atualizado."
+MSG[cli.update_dirty]="%s tem alterações locais — o firearchwsl em si não foi atualizado."
+MSG[cli.update_fetch]="Baixando o firearchwsl (%s)"
+MSG[cli.update_fetch_fail]="Não foi possível acessar o repositório do firearchwsl."
+MSG[cli.update_current]="firearchwsl já está atualizado: %s"
+MSG[cli.update_done]="firearchwsl atualizado para %s"
+MSG[cli.update_apply]="Rode 'firearch setup' para aplicar a nova versão."
+MSG[cli.doctor_title]="Diagnóstico"
+MSG[cli.report_ok]="Tudo certo por aqui."
+MSG[cli.report_warn]="%d item(ns) precisam de atenção (veja acima)."
+MSG[cli.logs_none]="Nenhum log do instalador em /var/log/firearchwsl."
+
+## Verificações do firearch doctor
+MSG[doc.wsl]="Rodando dentro do WSL"
+MSG[doc.wsl_fix]="O firearchwsl é feito para o WSL2."
+MSG[doc.systemd]="systemd está rodando"
+MSG[doc.systemd_fix]="No PowerShell: wsl --terminate %s (o systemd=true já está no /etc/wsl.conf)."
+MSG[doc.default_user]="%s é o usuário padrão do WSL"
+MSG[doc.default_user_fix]="Rode 'firearch setup' para gravar no /etc/wsl.conf."
+MSG[doc.wheel]="%s pode usar sudo (grupo wheel)"
+MSG[doc.wheel_fix]="Como root: usermod -aG wheel <usuário>"
+MSG[doc.interop]="Integração com o Windows funciona (cmd.exe acessível)"
+MSG[doc.interop_fix]="Confira o [interop] no /etc/wsl.conf e reinicie a distro."
+MSG[doc.dns]="DNS resolve archlinux.org"
+MSG[doc.dns_fix]="Confira o /etc/resolv.conf, VPN ou o modo de rede do WSL."
+MSG[doc.locale]="Locale válido"
+MSG[doc.locale_fix]="Rode 'firearch setup' para gerar de novo."
+MSG[doc.disk]="Mais de 5 GB livres em /"
+MSG[doc.disk_fix]="Libere espaço: sudo pacman -Sc, docker system prune."
+MSG[doc.mise]="Ferramentas do mise instaladas"
+MSG[doc.mise_fix]="Rode: mise install"
+MSG[doc.docker]="Serviço do Docker ativo"
+MSG[doc.docker_fix]="Rode: sudo systemctl enable --now docker"
+MSG[doc.docker_group]="%s está no grupo docker"
+MSG[doc.docker_group_fix]="No PowerShell: wsl --terminate %s (o grupo vale a partir do próximo início)."
+MSG[doc.font_hint]="Ícones do prompt aparecem como quadrados? Use uma Nerd Font no terminal (o bootstrap.ps1 instala a CaskaydiaMono Nerd Font)."

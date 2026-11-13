@@ -11,7 +11,7 @@ source "$_lib_dir/i18n.sh"
 source "$_lib_dir/ui.sh"
 unset _lib_dir
 
-# Optional components: langs, lazyvim, doom, docker.
+# Optional components: tuis, langs, lazyvim, doom, docker.
 # FIREARCH_SKIP is a comma- or space-separated list (e.g. "doom,docker").
 component_enabled() {
   local c
