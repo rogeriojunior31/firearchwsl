@@ -1,26 +1,27 @@
 #!/bin/bash
+# git config --global for the target user. Name/email come from wizard.sh.
 
-set -Eeuo pipefail
+: "${TARGET_USER:?TARGET_USER not set — run through install.sh}"
 
-: "${TARGET_USER:?TARGET_USER não definido — rode via install.sh}"
+if [[ -n "${FIREARCH_GIT_NAME:-}" ]]; then
+  as_user git config --global user.name "$FIREARCH_GIT_NAME"
+  ok "user.name  = $FIREARCH_GIT_NAME"
+else
+  skip "$(t git.name_skip)"
+fi
 
-echo "==== Configuração do Git ===="
+if [[ -n "${FIREARCH_GIT_EMAIL:-}" ]]; then
+  as_user git config --global user.email "$FIREARCH_GIT_EMAIL"
+  ok "user.email = $FIREARCH_GIT_EMAIL"
+else
+  skip "$(t git.email_skip)"
+fi
 
-read -rp "Digite seu nome para o Git (user.name): " git_name
-read -rp "Digite seu email para o Git (user.email): " git_email
-
-as_user git config --global user.name "$git_name"
-as_user git config --global user.email "$git_email"
-
-echo "✅ Nome e Email configurados com sucesso no Git."
-
-# Basic configs
+# Defaults and aliases
 as_user git config --global init.defaultBranch main
+as_user git config --global pull.rebase true
 as_user git config --global alias.co checkout
 as_user git config --global alias.br branch
 as_user git config --global alias.ci commit
 as_user git config --global alias.st status
-as_user git config --global pull.rebase true
-
-echo "✅ Configurações aplicadas a ~${TARGET_USER}/.gitconfig"
-echo "✨ Git configurado com sucesso!"
+ok "$(t git.defaults)"

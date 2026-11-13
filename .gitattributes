@@ -1,0 +1,4 @@
+# Scripts rodam dentro do WSL: CRLF quebra bash/fish. Força LF sempre.
+* text=auto eol=lf
+*.sh text eol=lf
+*.fish text eol=lf

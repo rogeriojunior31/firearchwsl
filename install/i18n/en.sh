@@ -1,0 +1,217 @@
+# shellcheck shell=bash disable=SC2034
+# name: English
+#
+# Reference catalog: every key must exist here. Other languages override keys;
+# anything they leave out falls back to this file.
+# Values are printf formats — keep the %s / %d placeholders and their order.
+
+I18N_LOCALE="en_US.UTF-8"
+I18N_LANGUAGE="en_US"
+I18N_YES_REGEX='^[yY]'
+I18N_YES_NO_HINT="[Y/n]"
+
+## Generic UI
+MSG[ui.yes]="Yes"
+MSG[ui.no]="No"
+MSG[ui.on]="yes"
+MSG[ui.off]="no"
+MSG[ui.cancelled]="Cancelled."
+MSG[ui.interrupted]="Interrupted by user."
+MSG[ui.invalid_choice]="Invalid value for %s: '%s' (options: %s)"
+MSG[ui.multi_hint]="space toggles · enter confirms"
+MSG[ui.install_q]="Install %s?"
+MSG[ui.pkg_count]="%s (%d packages)"
+
+## Banner
+MSG[banner.tagline]="Arch Linux + WSL2, from zero to a full dev environment."
+MSG[banner.log]="Full log: %s"
+
+## Pre-checks and usage
+MSG[pre.need_root]="Run as root inside the Arch WSL distro (e.g. wsl -d archlinux -u root)."
+MSG[pre.need_pacman]="pacman not found — this installer only supports Arch Linux."
+MSG[pre.unknown_opt]="Unknown option: %s"
+MSG[pre.unknown_lang]="Unknown language '%s'. Available: %s"
+MSG[usage]="firearchwsl — Arch Linux bootstrap for WSL2
+
+Usage (as root, inside the Arch WSL distro):
+  bash install.sh [options]
+
+Options:
+  -y, --yes       skip the final confirmation of the summary
+  -v, --verbose   show raw command output (no spinner)
+  -h, --help      show this help
+
+Environment variables (all optional in interactive mode):
+  FIREARCH_LANG        installer language: en, pt_BR
+  FIREARCH_USER        Linux username to create
+  FIREARCH_PASSWORD    user password (without it, set one later with passwd)
+  FIREARCH_GIT_NAME    git config user.name
+  FIREARCH_GIT_EMAIL   git config user.email
+  FIREARCH_SHELL       default shell: bash (default) or fish
+  FIREARCH_SKIP        components to skip: langs,lazyvim,doom,docker
+  FIREARCH_MISE_TOOLS  mise toolchains (default: \"python node bun rust go\")
+  FIREARCH_VERBOSE=1   same as --verbose
+  FIREARCH_LOG         log file path
+  FORCE_CONFIG=1       overwrite ~/.bashrc and config.fish (backs them up first)
+  DISABLE_CHAOTIC=1    do not add the Chaotic-AUR repository
+
+Fully unattended example:
+  FIREARCH_LANG=en FIREARCH_USER=jane FIREARCH_PASSWORD='s3cret' \\
+  FIREARCH_GIT_NAME='Jane Doe' FIREARCH_GIT_EMAIL='jane@example.com' \\
+  FIREARCH_SKIP=doom bash install.sh --yes"
+
+## Error trap
+MSG[err.title]="firearchwsl installation failed"
+MSG[err.step]="Step:"
+MSG[err.command]="Command:"
+MSG[err.where]="Where:"
+MSG[err.log_tail]="Last log lines:"
+MSG[err.log_full]="Full log:"
+MSG[err.rerun]="The installer is idempotent — fix the problem and run it again:"
+
+## Step titles
+MSG[step.base]="Preparing the base system"
+MSG[step.user]="User and sudo"
+MSG[step.locale]="System locale"
+MSG[step.wsl]="WSL tweaks"
+MSG[step.essentials]="Essential packages"
+MSG[step.git]="Git"
+MSG[step.repos]="Extra repositories"
+MSG[step.mise]="mise"
+MSG[step.tools]="Command-line tools"
+MSG[step.tuis]="TUIs"
+MSG[step.langs]="Languages (mise)"
+MSG[step.editors]="Editors"
+MSG[step.config]="User config"
+MSG[step.docker]="Docker"
+
+## Base
+MSG[base.sync]="Updating the system (pacman -Syu)"
+MSG[base.gum]="Installing gum (interactive prompts)"
+MSG[base.gum_fail]="gum unavailable — falling back to plain prompts."
+
+## Wizard
+MSG[wiz.user_known]="User registered by a previous run: %s"
+MSG[wiz.user_q]="Your Linux username (lowercase, no spaces)"
+MSG[wiz.user_invalid_env]="FIREARCH_USER missing or invalid ('%s'). E.g.: FIREARCH_USER=jane bash install.sh"
+MSG[wiz.user_invalid]="Invalid name: use lowercase letters, digits, '-' or '_' (and not 'root')."
+MSG[wiz.pw_q]="Password for %s (used by sudo)"
+MSG[wiz.pw_repeat]="Repeat the password"
+MSG[wiz.pw_mismatch]="Passwords do not match (or are empty). Try again."
+MSG[wiz.git_name_q]="Your name for Git — user.name (empty = skip)"
+MSG[wiz.git_email_q]="Your email for Git — user.email (empty = skip)"
+MSG[wiz.shell_q]="Default shell for the user"
+MSG[wiz.comp_q]="Optional components"
+MSG[wiz.comp_langs]="Python · Node · Bun · Rust · Go via mise"
+MSG[wiz.comp_lazyvim]="Neovim with LazyVim"
+MSG[wiz.comp_doom]="Doom Emacs (takes 5 to 15 min)"
+MSG[wiz.comp_docker]="Docker + buildx + compose"
+MSG[wiz.sum_title]="Installation summary"
+MSG[wiz.sum_user]="User"
+MSG[wiz.sum_password]="Password"
+MSG[wiz.sum_git]="Git"
+MSG[wiz.sum_shell]="Default shell"
+MSG[wiz.sum_langs]="Languages"
+MSG[wiz.sum_lazyvim]="LazyVim"
+MSG[wiz.sum_doom]="Doom Emacs"
+MSG[wiz.sum_docker]="Docker"
+MSG[wiz.pw_set]="set"
+MSG[wiz.pw_kept]="kept (user already exists)"
+MSG[wiz.pw_unset]="not set — set it later with passwd"
+MSG[wiz.confirm_q]="All good? Start the installation?"
+MSG[wiz.aborted]="Installation cancelled — nothing was changed besides the base system update."
+
+## User
+MSG[user.need_root]="This script must run as root."
+MSG[user.sudo]="Installing sudo"
+MSG[user.exists]="User '%s' already exists — moving on."
+MSG[user.add_wheel]="Adding '%s' to the wheel group"
+MSG[user.create]="Creating user '%s' (wheel group)"
+MSG[user.pw_set]="Password set for '%s'."
+MSG[user.no_pw]="User '%s' created WITHOUT a password (sudo will not work). Set one with: wsl -d %s -u root passwd %s"
+MSG[user.sudoers_invalid]="Invalid sudoers drop-in — removed. Aborting."
+MSG[user.sudo_ok]="sudo enabled for the wheel group."
+
+## Locale
+MSG[locale.gen]="Generating locales (%s)"
+MSG[locale.done]="Default language: %s (/etc/locale.conf)."
+
+## WSL
+MSG[wsl.default_user]="WSL default user: %s (/etc/wsl.conf)."
+MSG[wsl.systemd]="systemd enabled at WSL boot."
+MSG[wsl.libedit]="libedit.so.2 shim created."
+MSG[wsl.libedit_skip]="libedit.so not present — libedit.so.2 shim not needed right now."
+
+## Packages
+MSG[ess.install]="Installing essentials"
+MSG[tools.install]="Installing CLIs and fonts"
+MSG[tuis.install]="Installing TUIs and yazi previewers"
+MSG[mise.install]="Installing mise"
+
+## Git
+MSG[git.name_skip]="user.name not provided — later: git config --global user.name \"Your Name\""
+MSG[git.email_skip]="user.email not provided — later: git config --global user.email \"you@example.com\""
+MSG[git.defaults]="Defaults applied: main branch, pull.rebase, aliases co/br/ci/st."
+
+## Repositories
+MSG[repo.candy]="pacman: Color + ILoveCandy + VerbosePkgLists."
+MSG[repo.omarchy]="Omarchy repository enabled."
+MSG[repo.mirrors]="Mirrorlist: global mirrors."
+MSG[repo.chaotic_disabled]="Chaotic-AUR disabled (DISABLE_CHAOTIC)."
+MSG[repo.chaotic_arch]="Chaotic-AUR only exists for x86_64 — skipping."
+MSG[repo.chaotic_already]="Chaotic-AUR repository already enabled."
+MSG[repo.chaotic_setup]="Installing Chaotic-AUR keyring and mirrorlist"
+MSG[repo.chaotic_ok]="Chaotic-AUR repository enabled."
+MSG[repo.chaotic_fail]="Chaotic-AUR failed — continuing without it (use DISABLE_CHAOTIC=1 to skip it for good)."
+MSG[repo.sync]="Syncing repositories (pacman -Syu)"
+
+## Languages
+MSG[langs.skip]="Languages skipped (FIREARCH_SKIP=langs)."
+MSG[langs.fail]="Failed to install %s — later: mise use -g %s@latest"
+
+## Editors
+MSG[ed.lazy_skip]="LazyVim skipped (FIREARCH_SKIP=lazyvim)."
+MSG[ed.lazy_exists]="~/.config/nvim already exists — LazyVim left untouched."
+MSG[ed.lazy_clone]="Cloning the LazyVim starter"
+MSG[ed.lazy_fail]="LazyVim failed — check the log and clone it manually: https://www.lazyvim.org/installation"
+MSG[ed.doom_skip]="Doom Emacs skipped (FIREARCH_SKIP=doom)."
+MSG[ed.emacs]="Installing Emacs"
+MSG[ed.doom_exists]="Doom Emacs already installed in ~/.emacs.d."
+MSG[ed.doom_clone]="Cloning Doom Emacs"
+MSG[ed.doom_note]="Doom Emacs downloads and compiles packages: 5 to 15 min. Good time for a coffee ☕"
+MSG[ed.doom_fail]="doom install returned an error — later run: ~/.emacs.d/bin/doom doctor"
+
+## User config
+MSG[cfg.payloads]="Payloads copied to ~/.local/share/firearchwsl."
+MSG[cfg.rc_installed]="%s installed."
+MSG[cfg.rc_current]="%s is already up to date."
+MSG[cfg.rc_overwritten]="%s overwritten (backup: %s)."
+MSG[cfg.rc_preserved]="%s has local edits — preserved (FORCE_CONFIG=1 overwrites with a backup)."
+MSG[cfg.starship]="Starship pointed at the firearchwsl theme."
+MSG[cfg.shell_missing]="Shell %s not found — keeping the current shell."
+MSG[cfg.shell_already]="Default shell is already %s."
+MSG[cfg.shell_set]="Setting %s as the default shell"
+
+## Docker
+MSG[docker.skip]="Docker skipped (FIREARCH_SKIP=docker)."
+MSG[docker.install]="Installing Docker"
+MSG[docker.daemon_new]="/etc/docker/daemon.json created (logs: 10 MB x 5 files)."
+MSG[docker.daemon_keep]="/etc/docker/daemon.json already exists — preserved."
+MSG[docker.group_already]="%s is already in the docker group."
+MSG[docker.group_add]="Adding %s to the docker group"
+MSG[docker.enable]="Enabling and starting the docker service"
+MSG[docker.enable_fail]="Could not start docker — later: sudo systemctl enable --now docker"
+MSG[docker.no_systemd]="systemd is not active in this session — after restarting WSL run: sudo systemctl enable --now docker"
+
+## Finale
+MSG[fin.title]="All done! 🔥"
+MSG[fin.user]="User"
+MSG[fin.shell]="shell: %s"
+MSG[fin.time]="Total time"
+MSG[fin.warnings]="Warnings"
+MSG[fin.log]="Full log"
+MSG[fin.warn_header]="Warnings from this run:"
+MSG[fin.next]="Next steps"
+MSG[fin.step1]="In Windows PowerShell, restart the distro:"
+MSG[fin.step2]="Open it again with %s — you will log in as %s."
+MSG[fin.step3]="Use a Nerd Font in your Windows terminal to see the prompt icons."

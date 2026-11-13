@@ -10,7 +10,7 @@ set VISUAL nvim
 # Set "nvim" as manpager
 set -x MANPAGER "nvim +Man!"
 
-#### Set VI ou Emacs mode. 
+#### Set VI or Emacs mode
 function fish_user_key_bindings
     # fish_default_key_bindings
     fish_vi_key_bindings

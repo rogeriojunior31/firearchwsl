@@ -1,44 +1,52 @@
 #!/bin/bash
+# Creates the non-root user (wheel group), enables sudo and records the
+# target user. Asks nothing: FIREARCH_USER / FIREARCH_PASSWORD come from
+# wizard.sh.
 
 if [[ $EUID -ne 0 ]]; then
-  echo "⚠️ Este script deve ser executado como root (sudo)."
+  echo "✖ $(t user.need_root)"
   return 1 2>/dev/null || exit 1
 fi
+: "${FIREARCH_USER:?FIREARCH_USER not set — run through install.sh}"
 
-pacman -S --noconfirm --needed sudo
+username="$FIREARCH_USER"
 
-if [[ -f /etc/firearchwsl/target_user ]]; then
-  usuario="$(cat /etc/firearchwsl/target_user)"
-  echo "ℹ️  Usuário alvo já registrado: $usuario"
-else
-  read -rp "Digite o nome do novo usuário: " usuario
-fi
+run "$(t user.sudo)" pacman -S --needed --noconfirm sudo
 
-if id "$usuario" &>/dev/null; then
-  echo "ℹ️  Usuário '$usuario' já existe — seguindo."
-else
-  useradd -m -G wheel -s /bin/bash "$usuario"
-
-  echo "Digite a senha para o usuário $usuario:"
-  passwd "$usuario"
-
-  if ! id "$usuario" &>/dev/null; then
-    echo "❌ Falha ao criar o usuário."
-    return 1 2>/dev/null || exit 1
+if id "$username" &>/dev/null; then
+  ok "$(t user.exists "$username")"
+  if ! id -nG "$username" | tr ' ' '\n' | grep -qx wheel; then
+    run "$(t user.add_wheel "$username")" usermod -aG wheel "$username"
   fi
-  echo "Usuário '$usuario' criado com sucesso e adicionado ao grupo wheel!"
+else
+  run "$(t user.create "$username")" useradd -m -G wheel -s /bin/bash "$username"
+  if [[ -n "${FIREARCH_PASSWORD:-}" ]]; then
+    # Through stdin: the password never shows up in argv or in the log.
+    printf '%s:%s\n' "$username" "$FIREARCH_PASSWORD" | chpasswd
+    ok "$(t user.pw_set "$username")"
+  else
+    warn "$(t user.no_pw "$username" "${WSL_DISTRO_NAME:-archlinux}" "$username")"
+  fi
 fi
+unset FIREARCH_PASSWORD
 
-sed -i '/^# %wheel ALL=(ALL) ALL/s/^# //' /etc/sudoers
-if ! visudo -c -f /etc/sudoers >/dev/null 2>&1; then
-  echo "❌ /etc/sudoers inválido após edição — abortando."
-  return 1 2>/dev/null || exit 1
+# sudo for the wheel group through a drop-in (never edits /etc/sudoers)
+sudoers_dropin=/etc/sudoers.d/10-firearchwsl-wheel
+install -d -m 0750 /etc/sudoers.d
+printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' >"$sudoers_dropin"
+chmod 0440 "$sudoers_dropin"
+if ! visudo -cf "$sudoers_dropin" >/dev/null 2>&1; then
+  rm -f "$sudoers_dropin"
+  die "$(t user.sudoers_invalid)"
 fi
-echo "Usuário adicionado para ter permissão de sudo!"
+ok "$(t user.sudo_ok)"
 
+# Single source of truth for the target user on re-runs
 mkdir -p /etc/firearchwsl
-printf '%s\n' "$usuario" >/etc/firearchwsl/target_user
+printf '%s\n' "$username" >/etc/firearchwsl/target_user
 
-export TARGET_USER="$usuario"
-TARGET_HOME="$(getent passwd "$usuario" | cut -d: -f6)"
+export TARGET_USER="$username"
+TARGET_HOME="$(getent passwd "$username" | cut -d: -f6)"
 export TARGET_HOME
+ensure_target_user
+unset username sudoers_dropin

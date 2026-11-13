@@ -1,36 +1,50 @@
 #!/bin/bash
+# Extra repositories: Omarchy + Chaotic-AUR, colored pacman, global mirrors.
+# Every edit to /etc/pacman.conf is grep-guarded (re-runs never duplicate).
 
-# Add fun and color and verbosity to the pacman installer
+CHAOTIC_KEY=3056513887B78AEB
+
+# Color, the "pacman eating" progress bar and verbose package lists
 if ! grep -q "ILoveCandy" /etc/pacman.conf; then
-  sudo sed -i '/^\[options\]/a Color\nILoveCandy\nVerbosePkgLists' /etc/pacman.conf
+  sed -i '/^\[options\]/a Color\nILoveCandy\nVerbosePkgLists' /etc/pacman.conf
 fi
+ok "$(t repo.candy)"
 
-# Add the Omarchy repository
-if ! grep -q "omarchy" /etc/pacman.conf; then
-  echo -e "\n[omarchy]\nSigLevel = Optional TrustAll\nServer = https://pkgs.omarchy.org/\$arch/\n" | sudo tee -a /etc/pacman.conf >/dev/null
+# Omarchy
+if ! grep -q '^\[omarchy\]' /etc/pacman.conf; then
+  printf '\n[omarchy]\nSigLevel = Optional TrustAll\nServer = https://pkgs.omarchy.org/$arch/\n' >>/etc/pacman.conf
 fi
+ok "$(t repo.omarchy)"
 
-# Set mirrors to global ones only
-echo -e "Server = https://geo.mirror.pkgbuild.com/\$repo/os/\$arch\nServer = https://mirror.rackspace.com/archlinux/\$repo/os/\$arch" |
-  sudo tee /etc/pacman.d/mirrorlist >/dev/null
+# Global (geo-balanced) mirrors only
+printf '%s\n' \
+  'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
+  'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' \
+  >/etc/pacman.d/mirrorlist
+ok "$(t repo.mirrors)"
 
-# Only add Chaotic-AUR if the architecture is x86_64 so ARM users can build the packages
-if [[ "$(uname -m)" == "x86_64" ]] && [ -z "${DISABLE_CHAOTIC:-}" ]; then
-  # Try installing Chaotic-AUR keyring and mirrorlist
-  if ! pacman-key --list-keys 3056513887B78AEB >/dev/null 2>&1 &&
-    sudo pacman-key --recv-key 3056513887B78AEB &&
-    sudo pacman-key --lsign-key 3056513887B78AEB &&
-    sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' &&
-    sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'; then
-
-    # Add Chaotic-AUR repo to pacman config
-    if ! grep -q "chaotic-aur" /etc/pacman.conf; then
-      echo -e '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' | sudo tee -a /etc/pacman.conf >/dev/null
-    fi
-  else
-    echo -e "Failed to install Chaotic-AUR, so won't include it in pacman config!"
+# Chaotic-AUR is x86_64 only (on ARM the packages get built locally)
+setup_chaotic_keyring() {
+  if ! pacman-key --list-keys "$CHAOTIC_KEY" &>/dev/null; then
+    pacman-key --recv-key "$CHAOTIC_KEY" --keyserver keyserver.ubuntu.com || return 1
+    pacman-key --lsign-key "$CHAOTIC_KEY" || return 1
   fi
+  pacman -U --noconfirm --needed \
+    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
+    'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+}
+
+if [[ -n "${DISABLE_CHAOTIC:-}" ]]; then
+  skip "$(t repo.chaotic_disabled)"
+elif [[ "$(uname -m)" != "x86_64" ]]; then
+  skip "$(t repo.chaotic_arch)"
+elif grep -q '^\[chaotic-aur\]' /etc/pacman.conf; then
+  ok "$(t repo.chaotic_already)"
+elif run "$(t repo.chaotic_setup)" setup_chaotic_keyring; then
+  printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' >>/etc/pacman.conf
+  ok "$(t repo.chaotic_ok)"
+else
+  warn "$(t repo.chaotic_fail)"
 fi
 
-# Refresh all repos
-sudo pacman -Syu --noconfirm
+run "$(t repo.sync)" pacman -Syu --noconfirm

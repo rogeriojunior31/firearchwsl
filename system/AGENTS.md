@@ -1,48 +1,38 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
 
 # system
 
 ## Purpose
 
-System-level configuration scripts: touch `/etc/*` or create users/groups. All sourced by `install.sh` as root during the preparation phase.
+System-level configuration: scripts that touch `/etc/*` or create users/groups. All sourced by `install.sh` as root. None of them prompts — inputs come from `install/preflights/wizard.sh`.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `create_your_user.sh` | Interactive. Prompts for a username, runs `useradd -m -G wheel -s /bin/bash`, `passwd`, then uncomments `%wheel ALL=(ALL) ALL` in `/etc/sudoers`. Refuses if not root; exits early if the user already exists. Downstream contract: everything after assumes exactly one non-root user in `wheel`. |
-| `configure_locale.sh` | Installs `glibc`, uncomments `pt_BR.UTF-8 UTF-8` and `en_US.UTF-8 UTF-8` in `/etc/locale.gen` (falls back to appending if the line is absent), runs `locale-gen`, writes `/etc/locale.conf` with `LANG=pt_BR.UTF-8`, `LANGUAGE=pt_BR:en_US`, `LC_ALL=`. |
-| `wsl_config.sh` | One-liner: symlinks `/usr/lib/libedit.so` → `libedit.so.2`. Commented "OpenGL"; WSL-specific shim. |
-| `configure_git_user.sh` | Interactive. `git config --global` for `user.name` / `user.email`. Sets `init.defaultBranch=main`, `pull.rebase=true`, aliases `co`, `br`, `ci`, `st`. `set -euo pipefail`; validation is intentionally light. |
+| `create_your_user.sh` | Installs `sudo`; creates `FIREARCH_USER` with `useradd -m -G wheel -s /bin/bash` (or adds an existing user to `wheel`); sets the password through `chpasswd` on stdin (never argv/log), or warns when none was given; writes the `/etc/sudoers.d/10-firearchwsl-wheel` drop-in validated by `visudo -cf`; records `/etc/firearchwsl/target_user`; exports `TARGET_USER`/`TARGET_HOME`. |
+| `configure_locale.sh` | Enables `en_US.UTF-8` plus `I18N_LOCALE` (from the chosen language catalog) in `/etc/locale.gen`, runs `locale-gen`, writes `/etc/locale.conf` with `LANG=$I18N_LOCALE` and `LANGUAGE=$I18N_LANGUAGE`. |
+| `wsl_config.sh` | `wsl_conf_set <section> <key> <value>` (idempotent `/etc/wsl.conf` editor). Sets `[user] default=$TARGET_USER` and `[boot] systemd=true`. Also the `libedit.so.2` shim when `libedit.so` exists. |
+| `configure_git_user.sh` | `git config --global` for the target user: `user.name`/`user.email` when provided (skipped otherwise), `init.defaultBranch=main`, `pull.rebase=true`, aliases `co`/`br`/`ci`/`st`. |
 
 ## For AI Agents
 
 ### Working In This Directory
 
-- Root-required scripts use `if [[ $EUID -ne 0 ]]; then ... exit 1; fi` at the top.
-- Interactive prompts (`read -rp`) are the norm — these files are for first-time bootstrap, not unattended reruns.
-- `create_your_user.sh` is the pivot point: `config/config.sh` later resolves the target home via `getent group wheel` and takes the first member, so this script must put exactly one user in `wheel`.
+- Root guard pattern: `if [[ $EUID -ne 0 ]]; then …; return 1 2>/dev/null || exit 1; fi` (scripts are sourced).
+- Do not edit `/etc/sudoers` directly; a fresh Arch WSL image does not even ship it until `sudo` is installed. Use the drop-in.
+- `/etc/wsl.conf` may already carry settings (the official image ships `[boot] systemd=true`). Always go through `wsl_conf_set`; never overwrite the file.
+- The WSL default user only takes effect after `wsl --terminate <distro>`.
+- Do not run `pacman -Sy <pkg>` here (partial upgrade). The base is already synced by step 1.
 
 ### Testing Requirements
 
-- `create_your_user.sh`: verify `id <user>`, `groups <user>` contains `wheel`, and `sudo -l -U <user>` shows `(ALL) ALL`.
-- `configure_locale.sh`: `locale -a | grep pt_BR.utf8` should match; `/etc/locale.conf` should carry `LANG=pt_BR.UTF-8`.
-- `configure_git_user.sh`: `git config --global --list` should show the name/email and the four aliases.
-
-### Common Patterns
-
-- When adding a new system script, append it to `install.sh` in the preparation phase (between `create_your_user.sh` and `install-mise.sh`). Ordering matters because mise and the packaging phase both key off the non-root user existing.
+- `id <user>` shows `wheel`; `sudo -l -U <user>` shows `(ALL : ALL) ALL`.
+- `locale -a` lists the generated locales; `/etc/locale.conf` carries the chosen `LANG`.
+- `/etc/wsl.conf` has exactly one `[user]` and one `[boot]` section after two runs.
+- `git config --global --list` as the user shows identity and aliases.
 
 ## Dependencies
 
-### Internal
-
-- Sourced by `../install.sh` in the preparation phase.
-- `../config/config.sh` consumes the `wheel` membership set here.
-
-### External
-
-- `useradd`, `passwd`, `sudo`, `locale-gen`, `git`, `sed`, `pacman`.
-
-<!-- MANUAL: -->
+- `../install/preflights/lib.sh` (`run`, `t`, `as_user`), `../install/preflights/wizard.sh` (inputs).
+- `useradd`, `chpasswd`, `visudo`, `locale-gen`, `git`, `sed`.

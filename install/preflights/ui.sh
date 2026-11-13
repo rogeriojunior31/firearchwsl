@@ -1,0 +1,325 @@
+#!/bin/bash
+# firearchwsl UI layer: colors, steps, spinner, prompts, log file.
+# Sourced by lib.sh (after i18n.sh). Not an entry point.
+#
+#   ui_init                      set up colors, log file and TTY detection
+#   step "Title"                 open a numbered step  [03/14]
+#   run "label" cmd args…        run cmd behind a spinner; output goes to the log
+#   pac_install "label" pkg…     pacman -S --needed behind `run`
+#   msg / ok / warn / skip / die status lines
+#   ask_input / ask_secret / ask_confirm / ask_choose / ask_multi   prompts
+#
+# All text passed in is already translated — callers use "$(t key …)".
+#
+# Environment:
+#   FIREARCH_VERBOSE=1   show raw command output (no spinner)
+#   FIREARCH_LOG=<path>  log file (default: /var/log/firearchwsl/…)
+#   NO_COLOR=1           disable colors
+
+ui_init() {
+  UI_TTY=0
+  [[ -t 1 ]] && UI_TTY=1
+  UI_INTERACTIVE=0
+  [[ -t 0 && -t 1 ]] && UI_INTERACTIVE=1
+  UI_GUM=0
+  FIREARCH_VERBOSE="${FIREARCH_VERBOSE:-0}"
+
+  UI_COLS=80
+  if ((UI_TTY)) && command -v tput &>/dev/null; then
+    UI_COLS="$(tput cols 2>/dev/null || echo 80)"
+  fi
+
+  if ((UI_TTY)) && [[ -z "${NO_COLOR:-}" ]]; then
+    C_RESET=$'\e[0m' C_BOLD=$'\e[1m' C_DIM=$'\e[2m'
+    C_FIRE=$'\e[38;5;208m' C_RED=$'\e[38;5;203m' C_GREEN=$'\e[38;5;114m'
+    C_YELLOW=$'\e[38;5;220m' C_BLUE=$'\e[38;5;75m' C_GRAY=$'\e[38;5;245m'
+  else
+    C_RESET='' C_BOLD='' C_DIM='' C_FIRE='' C_RED='' C_GREEN=''
+    C_YELLOW='' C_BLUE='' C_GRAY=''
+  fi
+
+  # gum prompt theme (same "fire" palette)
+  export GUM_INPUT_PROMPT_FOREGROUND=208 GUM_INPUT_CURSOR_FOREGROUND=208
+  export GUM_INPUT_HEADER_FOREGROUND=220
+  export GUM_CHOOSE_CURSOR_FOREGROUND=208 GUM_CHOOSE_SELECTED_FOREGROUND=208
+  export GUM_CHOOSE_HEADER_FOREGROUND=220
+  export GUM_CONFIRM_PROMPT_FOREGROUND=220 GUM_CONFIRM_SELECTED_BACKGROUND=208
+
+  if [[ -z "${FIREARCH_LOG:-}" ]]; then
+    FIREARCH_LOG="/var/log/firearchwsl/install-$(date +%Y%m%d-%H%M%S).log"
+  fi
+  mkdir -p "$(dirname "$FIREARCH_LOG")" 2>/dev/null || FIREARCH_LOG="/tmp/firearchwsl-install.log"
+  : >>"$FIREARCH_LOG"
+  export FIREARCH_LOG
+
+  UI_STEP_N=0
+  UI_STEP_TOTAL="${UI_STEP_TOTAL:-0}"
+  UI_STEP_TITLE=""
+  UI_WARNINGS=()
+  UI_FAIL_LABEL=""
+  UI_FAIL_CMD=""
+  UI_T0=$SECONDS
+
+  trap '_ui_restore_cursor' EXIT
+  trap '_ui_restore_cursor; printf "\n%s  ✖ %s%s\n" "$C_RED" "$(t ui.interrupted)" "$C_RESET"; exit 130' INT
+}
+
+_ui_restore_cursor() { ((${UI_TTY:-0})) && printf '\e[?25h' || true; }
+
+# Append one plain (uncolored) line to the log.
+_log() { printf '%s\n' "$*" >>"${FIREARCH_LOG:-/dev/null}"; }
+
+# 75 → "1m15s"
+_fmt_dur() {
+  local s=$1
+  if ((s >= 60)); then printf '%dm%02ds' $((s / 60)) $((s % 60)); else printf '%ds' "$s"; fi
+}
+
+# Re-detect gum (called once it has been installed).
+ui_detect_gum() {
+  UI_GUM=0
+  if ((UI_INTERACTIVE)) && command -v gum &>/dev/null; then UI_GUM=1; fi
+}
+
+## ── Status lines ────────────────────────────────────────────────────────────
+
+msg()  { printf '  %s•%s %s\n' "$C_BLUE" "$C_RESET" "$*"; _log "[INFO] $*"; }
+ok()   { printf '  %s✔%s %s\n' "$C_GREEN" "$C_RESET" "$*"; _log "[ OK ] $*"; }
+skip() { printf '  %s↷ %s%s\n' "$C_GRAY" "$*" "$C_RESET"; _log "[SKIP] $*"; }
+hint() { printf '  %s%s%s\n' "$C_GRAY" "$*" "$C_RESET"; }
+# Warnings are collected and repeated in the final summary.
+warn() {
+  printf '  %s⚠ %s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2
+  _log "[WARN] $*"
+  UI_WARNINGS+=("$*")
+}
+die() {
+  printf '\n  %s✖ %s%s\n' "$C_RED" "$*" "$C_RESET" >&2
+  _log "[FAIL] $*"
+  exit 1
+}
+
+# Step header:  ━━ [03/14] Locale ━━━━━━━━━━━━━
+step() {
+  UI_STEP_N=$((UI_STEP_N + 1))
+  UI_STEP_TITLE="$1"
+  local tag
+  if ((UI_STEP_TOTAL > 0)); then
+    tag="$(printf '[%02d/%02d]' "$UI_STEP_N" "$UI_STEP_TOTAL")"
+  else
+    tag="$(printf '[%02d]' "$UI_STEP_N")"
+  fi
+  local width=$((UI_COLS < 72 ? UI_COLS : 72))
+  local fill=$((width - ${#tag} - ${#1} - 6))
+  ((fill < 3)) && fill=3
+  local bar
+  bar="$(printf '━%.0s' $(seq 1 "$fill"))"
+  printf '\n%s━━ %s%s %s%s %s%s%s\n' "$C_FIRE" "$C_BOLD" "$tag" "$1" "$C_RESET" "$C_FIRE" "$bar" "$C_RESET"
+  _log ""
+  _log "════ $tag $1 ════"
+}
+
+## ── Command execution ───────────────────────────────────────────────────────
+
+# Last useful log line, ANSI-stripped and truncated to fit beside the spinner.
+_ui_log_tail() {
+  local max=$1
+  ((max < 12)) && return 0
+  tail -n 1 "$FIREARCH_LOG" 2>/dev/null |
+    sed -e '/^\$ /d' -e 's/\x1b\[[0-9;?]*[A-Za-z]//g' -e 's/.*\r//' -e 's/^[[:space:]]*//' |
+    cut -c "1-$max"
+}
+
+# run "label" cmd args…
+#   TTY:      spinner + elapsed time + last log line; ✔/✖ when done
+#   verbose:  raw output on screen (and in the log)
+#   no TTY:   only the final ✔/✖ line (good for CI / captured logs)
+# Returns the command's exit code. Use `run … || warn …` for non-fatal steps.
+# cmd may be a shell function; it runs in a subshell, so it cannot set
+# variables in the caller.
+run() {
+  local label=$1
+  shift
+  local t0=$SECONDS rc=0
+  _log ""
+  _log "▶ $label"
+  _log "\$ $*"
+
+  if ((FIREARCH_VERBOSE)); then
+    printf '  %s▶ %s%s\n' "$C_FIRE" "$label" "$C_RESET"
+    { (trap - ERR; "$@") 2>&1 | tee -a "$FIREARCH_LOG"; } && rc=0 || rc=$?
+  elif ((UI_TTY)); then
+    (trap - ERR; "$@") >>"$FIREARCH_LOG" 2>&1 </dev/null &
+    local pid=$! i=0 tail_line=""
+    local frames=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+    printf '\e[?25l'
+    while kill -0 "$pid" 2>/dev/null; do
+      if ((i % 5 == 0)); then
+        tail_line="$(_ui_log_tail $((UI_COLS - ${#label} - 18)))" || tail_line=""
+      fi
+      printf '\r\e[2K  %s%s%s %s %s(%s)%s %s%s%s' \
+        "$C_FIRE" "${frames[i % 10]}" "$C_RESET" "$label" \
+        "$C_GRAY" "$(_fmt_dur $((SECONDS - t0)))" "$C_RESET" \
+        "$C_DIM" "$tail_line" "$C_RESET"
+      i=$((i + 1))
+      sleep 0.1
+    done
+    wait "$pid" && rc=0 || rc=$?
+    printf '\r\e[2K\e[?25h'
+  else
+    (trap - ERR; "$@") >>"$FIREARCH_LOG" 2>&1 </dev/null && rc=0 || rc=$?
+  fi
+
+  local dur
+  dur="$(_fmt_dur $((SECONDS - t0)))"
+  if ((rc == 0)); then
+    printf '  %s✔%s %s %s(%s)%s\n' "$C_GREEN" "$C_RESET" "$label" "$C_GRAY" "$dur" "$C_RESET"
+    _log "[ OK ] $label ($dur)"
+  else
+    printf '  %s✖ %s%s %s(%s, exit %d)%s\n' "$C_RED" "$label" "$C_RESET" "$C_GRAY" "$dur" "$rc" "$C_RESET"
+    _log "[FAIL] $label ($dur, exit $rc)"
+    UI_FAIL_LABEL="$label"
+    UI_FAIL_CMD="$*"
+  fi
+  return "$rc"
+}
+
+# pac_install "label" pkg…  — pacman -S --needed, package count in the label.
+pac_install() {
+  local label=$1
+  shift
+  run "$(t ui.pkg_count "$label" "$#")" pacman -S --needed --noconfirm "$@"
+}
+
+## ── Boxes and banner ────────────────────────────────────────────────────────
+
+# ui_box "Title" "line 1" "line 2" …
+ui_box() {
+  local title=$1 line
+  shift
+  printf '\n  %s╭─ %s%s%s\n' "$C_FIRE" "$C_BOLD" "$title" "$C_RESET"
+  for line in "$@"; do
+    printf '  %s│%s  %s\n' "$C_FIRE" "$C_RESET" "$line"
+  done
+  printf '  %s╰─%s\n' "$C_FIRE" "$C_RESET"
+}
+
+# ui_row "Label" "value" → "Label ........ value" (dot leaders, 16 columns).
+# Padding is computed by hand: printf's %-Ns counts bytes, not characters.
+ui_row() {
+  local label=$1 dots
+  dots="$(printf '.%.0s' $(seq 1 $((16 - ${#label} > 2 ? 16 - ${#label} : 2))))"
+  printf '%s %s%s%s %s' "$label" "$C_GRAY" "$dots" "$C_RESET" "$2"
+}
+
+# Logo with a "fire" gradient (compact variant on narrow terminals).
+ui_banner() {
+  local logo="${FIREARCH_ROOT:-.}/logo.txt"
+  local grad=(196 202 208 214 220 226 245) n=0 line
+  echo
+  if ((UI_COLS >= 88)) && [[ -r "$logo" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ -n "$C_RESET" ]]; then
+        printf '\e[38;5;%sm%s\e[0m\n' "${grad[n < 6 ? n : 6]}" "$line"
+      else
+        printf '%s\n' "$line"
+      fi
+      n=$((n + 1))
+    done <"$logo"
+  else
+    printf '  %s%s🔥 FIREARCHWSL%s %s— by Rogerio Junior%s\n' "$C_BOLD" "$C_FIRE" "$C_RESET" "$C_GRAY" "$C_RESET"
+  fi
+  printf '\n  %s%s%s\n' "$C_GRAY" "$(t banner.tagline)" "$C_RESET"
+  printf '  %s%s%s\n' "$C_GRAY" "$(t banner.log "$FIREARCH_LOG")" "$C_RESET"
+}
+
+## ── Prompts ─────────────────────────────────────────────────────────────────
+# Shared rule: a variable already set in the environment is never asked for.
+# Without a TTY the default is used.
+
+# ask_input VAR "Question" [default]
+ask_input() {
+  local var=$1 prompt=$2 def=${3:-} val
+  if [[ -n "${!var:-}" ]]; then return 0; fi
+  if ((UI_INTERACTIVE)); then
+    if ((UI_GUM)); then
+      val="$(gum input --header "$prompt" --prompt "› " --value "$def")" || die "$(t ui.cancelled)"
+    else
+      read -rp "  $prompt${def:+ [$def]}: " val || die "$(t ui.cancelled)"
+      val="${val:-$def}"
+    fi
+  else
+    val="$def"
+  fi
+  printf -v "$var" '%s' "$val"
+}
+
+# ask_secret VAR "Question"  — the value is never echoed or logged.
+ask_secret() {
+  local var=$1 prompt=$2 val=""
+  if ((UI_GUM)); then
+    val="$(gum input --password --header "$prompt" --prompt "› ")" || die "$(t ui.cancelled)"
+  else
+    read -rsp "  $prompt: " val || die "$(t ui.cancelled)"
+    echo
+  fi
+  printf -v "$var" '%s' "$val"
+}
+
+# ask_confirm "Question"  — exit 0 means yes. Without a TTY the answer is yes.
+ask_confirm() {
+  local ans
+  ((UI_INTERACTIVE)) || return 0
+  if ((UI_GUM)); then
+    gum confirm --affirmative "$(t ui.yes)" --negative "$(t ui.no)" "$1"
+  else
+    read -rp "  $1 $I18N_YES_NO_HINT: " ans || return 1
+    [[ -z "$ans" || "$ans" =~ $I18N_YES_REGEX ]]
+  fi
+}
+
+# ask_choose VAR "Question" default option…
+ask_choose() {
+  local var=$1 prompt=$2 def=$3 val opt
+  shift 3
+  if [[ -n "${!var:-}" ]]; then
+    val="${!var}"
+  elif ((UI_INTERACTIVE)); then
+    if ((UI_GUM)); then
+      val="$(gum choose --header "$prompt" --selected "$def" "$@")" || die "$(t ui.cancelled)"
+    else
+      read -rp "  $prompt ($(IFS=/; echo "$*")) [$def]: " val || die "$(t ui.cancelled)"
+      val="${val:-$def}"
+    fi
+  else
+    val="$def"
+  fi
+  for opt in "$@"; do
+    if [[ "$opt" == "$val" ]]; then
+      printf -v "$var" '%s' "$val"
+      return 0
+    fi
+  done
+  die "$(t ui.invalid_choice "$var" "$val" "$*")"
+}
+
+# ask_multi VAR "Question" "key — description"…
+# Everything starts selected; VAR receives the selected KEYS (first word),
+# space-separated.
+ask_multi() {
+  local var=$1 prompt=$2 picked="" item out
+  shift 2
+  if ((UI_INTERACTIVE && UI_GUM)); then
+    out="$(gum choose --no-limit --selected "*" \
+      --header "$prompt ($(t ui.multi_hint))" "$@")" || die "$(t ui.cancelled)"
+    while IFS= read -r item; do
+      [[ -n "$item" ]] && picked+="${item%% *} "
+    done <<<"$out"
+  else
+    ((UI_INTERACTIVE)) && printf '  %s\n' "$prompt"
+    for item in "$@"; do
+      if ask_confirm "$(t ui.install_q "$item")"; then picked+="${item%% *} "; fi
+    done
+  fi
+  printf -v "$var" '%s' "${picked% }"
+}
