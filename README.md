@@ -44,35 +44,44 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
 ## Como fica na tela
 
 ```
-  ╭─ Resumo da instalação
-  │  Usuário ......... fulano
-  │  Senha ........... definida
-  │  Git ............. Fulano <fulano@exemplo.com>
-  │  Hostname ........ meuarch
-  │  Shell padrão .... fish
-  │  Perfil .......... dev
-  │  TUIs ............ sim
-  │  Linguagens ...... sim (python node bun rust go)
-  │  LazyVim ......... sim
-  │  Doom Emacs ...... não
-  │  Docker .......... sim
-  ╰─
+            ███████╗██╗██████╗ ███████╗ █████╗ ██████╗  ██████╗██╗  ██╗██╗    ██╗███████╗██╗
+            ██╔════╝██║██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██║  ██║██║    ██║██╔════╝██║
+            █████╗  ██║██████╔╝█████╗  ███████║██████╔╝██║     ███████║██║ █╗ ██║███████╗██║
+            ██╔══╝  ██║██╔══██╗██╔══╝  ██╔══██║██╔══██╗██║     ██╔══██║██║███╗██║╚════██║██║
+            ██║     ██║██║  ██║███████╗██║  ██║██║  ██║╚██████╗██║  ██║╚███╔███╔╝███████║███████╗
+            ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚══════╝╚══════╝
+                                                                                by Rogerio Junior
 
-━━ [02/14] Usuário e sudo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ▱▱▱▱▱▱▱▱▱▱   7% · 1m04s
-  ✔ Instalando sudo (2s)
-  ✔ Criando usuário 'fulano' (grupo wheel) (0s)
-  ✔ Senha definida para 'fulano'.
-  ✔ sudo liberado para o grupo wheel.
+            [09/14] Ferramentas de linha de comando                                     ⚠ 1  2m31s
+            ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  57%
 
-━━ [09/14] Ferramentas de linha de comando ━━━━━━━━━━━━━━━━ ▰▰▰▰▰▱▱▱▱▱  57% · 2m31s
-  ⠹ Instalando CLIs e fontes (35 pacotes) (41s) downloading starship...
+            ✔ Preparando a base                  1m04s ✔ mise                                  3s
+            ✔ Usuário e sudo                        2s ⠏ Ferramentas de linha de comando
+            ✔ Locale do sistema                     4s · TUIs
+            ✔ Ajustes do WSL                        1s · Linguagens (mise)
+            ✔ Pacotes essenciais                   38s · Editores
+            ✔ Git                                   0s · Configs do usuário
+            ✔ Repositórios extras                  51s · Docker
+
+            ⠏ Instalando CLIs e fontes (35 pacotes) (41s)
+            ──────────────────────────────────────────────────────────────────────────────────────
+            ✔ Etapa mise configurada.
+            ⚠ Não encontrado em nenhum repositório, pulado: pacote-x
+              ( 4/35) installing starship
+              ( 5/35) installing tldr
 ```
 
-- **Progresso geral** no cabeçalho de cada etapa (barra, % e tempo decorrido), no título da aba e no anel de progresso da aba/barra de tarefas do Windows Terminal (fica vermelho se algo falhar).
-- **Spinner** com tempo decorrido e a última linha do log ao lado.
-- **✔ / ⚠ / ↷ / ✖** para feito, aviso, pulado e erro.
-- Em caso de erro: etapa, comando, as últimas linhas do log e como retomar.
-- No final: resumo, avisos acumulados e os próximos passos.
+Num terminal de verdade, o instalador usa a **tela cheia**, no estilo do Omarchy:
+
+- **Logo centralizado** no topo (versão compacta em janelas pequenas).
+- **Progresso geral**: etapa atual, tempo decorrido, avisos e a barra. O mesmo progresso aparece no título da aba e no anel de progresso da aba/barra de tarefas do Windows Terminal (fica vermelho se algo falhar).
+- **As 14 etapas** com ✔ e o tempo de cada uma, a atual girando, as próximas em cinza.
+- **Janela ao vivo do log**: o que os comandos estão fazendo agora, com ✔ / ⚠ / ↷ coloridos.
+- As **perguntas** abrem numa tela limpa com o logo, alinhadas na mesma coluna, e o **resumo** vem numa caixa.
+- Em caso de **erro**: etapa, comando, as últimas linhas do log e um menu — **tentar de novo** (o que já foi feito é mantido), **ler o log completo** ou **sair**.
+- No **final**: logo animado, resumo, todas as etapas com os tempos, avisos acumulados e os próximos passos.
+
+Sem terminal (CI, saída capturada), com `--verbose`, em janelas menores que 60×20 ou com `FIREARCH_TUI=0`, ele volta para a saída linha a linha.
 
 ---
 
@@ -227,6 +236,7 @@ Os prompts leem direto do terminal (`/dev/tty`), então continuam funcionando me
 | `DISABLE_CHAOTIC=1` | Não adiciona o Chaotic-AUR |
 | `NO_COLOR=1` | Desliga as cores |
 | `FIREARCH_NO_GUM=1` | Prompts simples (`read`) em vez do `gum` |
+| `FIREARCH_TUI=0` | Saída linha a linha em vez da tela cheia |
 
 ---
 
@@ -299,6 +309,7 @@ firearchwsl/
 │   │   ├── lib.sh             # Carrega i18n + ui; helpers do usuário-alvo (as_user)
 │   │   ├── i18n.sh            # t, i18n_load, seletor de idioma
 │   │   ├── ui.sh              # step, run (spinner), prompts, log
+│   │   ├── tui.sh             # Tela cheia: logo, progresso, etapas, log ao vivo
 │   │   ├── trap-errors.sh     # Tela de erro
 │   │   ├── wizard.sh          # Questionário inicial
 │   │   ├── finale.sh          # Tela final

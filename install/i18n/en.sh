@@ -61,6 +61,7 @@ Environment variables (all optional in interactive mode):
   FIREARCH_HOME_DIRS   folders created in the home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   same as --verbose
   FIREARCH_NO_GUM=1    plain prompts instead of gum
+  FIREARCH_TUI=0       line-by-line output instead of the full-screen view
   FIREARCH_LOG         log file path
   FORCE_CONFIG=1       overwrite ~/.bashrc and config.fish (backs them up first)
   DISABLE_CHAOTIC=1    do not add the Chaotic-AUR repository
@@ -77,6 +78,10 @@ MSG[err.command]="Command:"
 MSG[err.where]="Where:"
 MSG[err.log_tail]="Last log lines:"
 MSG[err.log_full]="Full log:"
+MSG[err.menu_q]="What now?"
+MSG[err.menu_retry]="try again (everything done so far is kept)"
+MSG[err.menu_log]="read the full log"
+MSG[err.menu_exit]="quit"
 MSG[err.rerun]="The installer is idempotent — fix the problem and run it again:"
 
 ## Step titles
@@ -103,6 +108,7 @@ MSG[base.gum]="Installing gum (interactive prompts)"
 MSG[base.gum_fail]="gum unavailable — falling back to plain prompts."
 
 ## Wizard
+MSG[wiz.title]="Let's set up your environment"
 MSG[wiz.user_known]="User registered by a previous run: %s"
 MSG[wiz.user_q]="Your Linux username (lowercase, no spaces)"
 MSG[wiz.user_invalid_env]="FIREARCH_USER missing or invalid ('%s'). E.g.: FIREARCH_USER=jane bash install.sh"
@@ -246,6 +252,7 @@ MSG[docker.no_systemd]="systemd is not active in this session — after restarti
 MSG[fin.title]="All done! 🔥"
 MSG[fin.user]="User"
 MSG[fin.shell]="shell: %s"
+MSG[fin.profile]="Profile"
 MSG[fin.time]="Total time"
 MSG[fin.warnings]="Warnings"
 MSG[fin.log]="Full log"

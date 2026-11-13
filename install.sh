@@ -60,7 +60,30 @@ if [[ -z "$_lang_from_env" ]] && ((UI_INTERACTIVE)); then
 fi
 unset _lang_from_env
 
-ui_banner
+## ── Steps 2..14 — the order is load-bearing, do not reshuffle ───────────────
+# "<i18n title key>|<script>"
+STEPS=(
+  "step.user|$FIREARCH_SYSTEM/create_your_user.sh"
+  "step.locale|$FIREARCH_SYSTEM/configure_locale.sh"
+  "step.wsl|$FIREARCH_SYSTEM/wsl_config.sh"
+  "step.essentials|$FIREARCH_INSTALL/preflights/essentials_pkgs.sh"
+  "step.git|$FIREARCH_SYSTEM/configure_git_user.sh"
+  "step.repos|$FIREARCH_INSTALL/preflights/repositories.sh"
+  "step.mise|$FIREARCH_INSTALL/preflights/install-mise.sh"
+  "step.tools|$FIREARCH_INSTALL/pkgs/good-tools.sh"
+  "step.tuis|$FIREARCH_INSTALL/pkgs/tuis.sh"
+  "step.langs|$FIREARCH_INSTALL/pkgs/install_langs.sh"
+  "step.editors|$FIREARCH_INSTALL/pkgs/editors.sh"
+  "step.config|$FIREARCH_CONFIG/config.sh"
+  "step.docker|$FIREARCH_CONFIG/docker.sh"
+)
+
+# Titles of every step, in the language just picked (full-screen step list).
+UI_STEP_TITLES=("$(t step.base)")
+for _entry in "${STEPS[@]}"; do UI_STEP_TITLES+=("$(t "${_entry%%|*}")"); done
+
+# Full-screen view on a real terminal; line-by-line output everywhere else.
+tui_start || ui_banner
 
 ## ── Step 1: base ────────────────────────────────────────────────────────────
 step "$(t step.base)"
@@ -81,25 +104,12 @@ fi
 ui_detect_gum
 
 ## ── Questionnaire (ask everything now; run unattended afterwards) ───────────
+# Prompts need the normal screen; the view comes back right after.
+_tui_was_on=$UI_TUI
+tui_stop
 source "$FIREARCH_INSTALL/preflights/wizard.sh"
-
-## ── Steps 2..14 — the order is load-bearing, do not reshuffle ───────────────
-# "<i18n title key>|<script>"
-STEPS=(
-  "step.user|$FIREARCH_SYSTEM/create_your_user.sh"
-  "step.locale|$FIREARCH_SYSTEM/configure_locale.sh"
-  "step.wsl|$FIREARCH_SYSTEM/wsl_config.sh"
-  "step.essentials|$FIREARCH_INSTALL/preflights/essentials_pkgs.sh"
-  "step.git|$FIREARCH_SYSTEM/configure_git_user.sh"
-  "step.repos|$FIREARCH_INSTALL/preflights/repositories.sh"
-  "step.mise|$FIREARCH_INSTALL/preflights/install-mise.sh"
-  "step.tools|$FIREARCH_INSTALL/pkgs/good-tools.sh"
-  "step.tuis|$FIREARCH_INSTALL/pkgs/tuis.sh"
-  "step.langs|$FIREARCH_INSTALL/pkgs/install_langs.sh"
-  "step.editors|$FIREARCH_INSTALL/pkgs/editors.sh"
-  "step.config|$FIREARCH_CONFIG/config.sh"
-  "step.docker|$FIREARCH_CONFIG/docker.sh"
-)
+((_tui_was_on)) && tui_start
+unset _tui_was_on
 
 for _entry in "${STEPS[@]}"; do
   step "$(t "${_entry%%|*}")"

@@ -58,6 +58,7 @@ Variáveis de ambiente (todas opcionais no modo interativo):
   FIREARCH_MISE_TOOLS  toolchains do mise (default: \"python node bun rust go\")
   FIREARCH_HOME_DIRS   pastas criadas na home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   igual a --verbose
+  FIREARCH_TUI=0       saída linha a linha em vez da tela cheia
   FIREARCH_NO_GUM=1    prompts simples em vez do gum
   FIREARCH_LOG         caminho do arquivo de log
   FORCE_CONFIG=1       sobrescreve ~/.bashrc e config.fish (faz backup antes)
@@ -75,6 +76,10 @@ MSG[err.command]="Comando:"
 MSG[err.where]="Onde:"
 MSG[err.log_tail]="Últimas linhas do log:"
 MSG[err.log_full]="Log completo:"
+MSG[err.menu_q]="E agora?"
+MSG[err.menu_retry]="tentar de novo (o que já foi feito é mantido)"
+MSG[err.menu_log]="ler o log completo"
+MSG[err.menu_exit]="sair"
 MSG[err.rerun]="O instalador é idempotente — corrija o problema e rode de novo:"
 
 ## Step titles
@@ -101,6 +106,7 @@ MSG[base.gum]="Instalando gum (prompts interativos)"
 MSG[base.gum_fail]="gum indisponível — usando prompts simples."
 
 ## Wizard
+MSG[wiz.title]="Vamos configurar o seu ambiente"
 MSG[wiz.user_known]="Usuário já registrado em execução anterior: %s"
 MSG[wiz.user_q]="Nome do seu usuário Linux (minúsculas, sem espaço)"
 MSG[wiz.user_invalid_env]="FIREARCH_USER ausente ou inválido ('%s'). Ex.: FIREARCH_USER=fulano bash install.sh"
@@ -244,6 +250,7 @@ MSG[docker.no_systemd]="systemd não está ativo nesta sessão — após reinici
 MSG[fin.title]="Tudo pronto, dog! 🔥"
 MSG[fin.user]="Usuário"
 MSG[fin.shell]="shell: %s"
+MSG[fin.profile]="Perfil"
 MSG[fin.time]="Tempo total"
 MSG[fin.warnings]="Avisos"
 MSG[fin.log]="Log completo"

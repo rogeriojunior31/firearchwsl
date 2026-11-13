@@ -13,7 +13,8 @@ The installer's runtime (library, translations, UI, error trap, wizard, finale) 
 | `lib.sh` | Sourced first by `install.sh`. Sources `i18n.sh` and `ui.sh`; defines `component_enabled`, `resolve_target_user`, `ensure_target_user`, `as_user`. |
 | `i18n.sh` | `i18n_load <lang>` (loads `../i18n/en.sh`, then the language on top), `t <key> [args]`, `i18n_available`, `i18n_name`, `i18n_choose` (numbered picker using plain `read`, because it runs before `gum` exists). Default language: `I18N_DEFAULT_LANG` (`pt_BR`). |
 | `ui.sh` | `ui_init`, `step`, `run`, `pac_install`, status lines (`msg`/`ok`/`skip`/`hint`/`warn`/`die`), `ui_box`, `ui_row`, `ui_banner`, prompts (`ask_input`/`ask_secret`/`ask_confirm`/`ask_choose`/`ask_multi`). Owns the log file (`FIREARCH_LOG`). |
-| `trap-errors.sh` | `ERR` trap: prints step, failing command, last 15 log lines, log path and the re-run command. |
+| `tui.sh` | Full-screen view (Omarchy-style): `tui_start` / `tui_stop` (alternate screen; stdout+stderr go to the log, the view paints on fd 3), `tui_draw` (logo, progress, two-column step grid from `UI_STEP_TITLES`, current command, live log window), `ui_screen` (clear + centered logo + title, aligns prompts through `UI_PAD` and `GUM_*_PADDING`), `ui_steps_recap`. Used only on a TTY ≥ 60×20 without `--verbose` and with `FIREARCH_TUI` ≠ 0. |
+| `trap-errors.sh` | `ERR` trap: leaves the full-screen view, prints step, failing command, last 15 log lines, log path and the re-run command, then (on a terminal) a menu: retry (`exec install.sh`, with `--yes` once the wizard was confirmed; its answers are exported), read the log, quit. |
 | `wizard.sh` | The only place that asks questions: user (rejects invalid names and system accounts, UID < 1000), password (mandatory for a new user, typed twice), git identity, hostname, default shell, install profile (`minimal`/`dev`/`full`/`custom`; `custom` opens the component list and then the language list). Prints the summary; "no" goes back to the form with previous answers pre-filled (password excepted), Ctrl+C cancels. Every answer has a `FIREARCH_*` env override; env-provided answers are fixed and never re-asked. Without a terminal, a new user without `FIREARCH_PASSWORD` is a hard stop. |
 | `finale.sh` | `tte` logo animation (TTY only), summary box, collected warnings, next steps. |
 | `essentials_pkgs.sh` | Minimal `PACMAN_PKGS`: `sudo`, `base-devel`, `diffutils`, `git`, `fish`, `curl`… |
@@ -21,6 +22,14 @@ The installer's runtime (library, translations, UI, error trap, wizard, finale) 
 | `install-mise.sh` | `pacman -S mise`. Shell activation lives in `default/bashrc` and `default/config.fish`. |
 
 ## For AI Agents
+
+### Full-screen view
+
+- While `UI_TUI=1`, `msg`/`ok`/`skip`/`warn`/`hint` only write the log and repaint; the view shows the log. Never `printf` straight to the screen from a step: stdout is the log at that point.
+- `tui_draw` runs ten times a second from `run`: no subshells in the hot path (`_tui_fit` and friends use `printf -v` / namerefs).
+- The wizard runs on the normal screen (`install.sh` stops the view around it). The finale and the ERR trap call `tui_stop` first.
+- `ui_init` switches to `LC_CTYPE=C.UTF-8` on a non-UTF-8 locale: widths come from `${#s}`; `ui_box` uses `wc -L` (emoji are two columns).
+- Visual check without a real terminal: record with `script -qec 'stty cols 110 rows 34; …' out.raw` and render the recording with a terminal emulator library (e.g. Python `pyte`).
 
 ### How `run` behaves
 
