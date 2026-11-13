@@ -7,14 +7,15 @@
 # keeps whatever else is already in the file.
 wsl_conf_set() {
   local section=$1 key=$2 value=$3 file=/etc/wsl.conf
+  local header="^\\[${section}\\]"
   touch "$file"
-  if ! grep -q "^\[$section\]" "$file"; then
+  if ! grep -q "$header" "$file"; then
     [[ -s "$file" ]] && echo >>"$file"
     printf '[%s]\n%s=%s\n' "$section" "$key" "$value" >>"$file"
-  elif sed -n "/^\[$section\]/,/^\[/p" "$file" | grep -q "^$key[[:space:]]*="; then
-    sed -i "/^\[$section\]/,/^\[/ s|^$key[[:space:]]*=.*|$key=$value|" "$file"
+  elif sed -n "/${header}/,/^\\[/p" "$file" | grep -q "^${key}[[:space:]]*="; then
+    sed -i "/${header}/,/^\\[/ s|^${key}[[:space:]]*=.*|${key}=${value}|" "$file"
   else
-    sed -i "/^\[$section\]/a $key=$value" "$file"
+    sed -i "/${header}/a ${key}=${value}" "$file"
   fi
 }
 
@@ -64,6 +65,7 @@ elif [[ ! -e "$_miserc" ]]; then
 elif grep -qF "$_win_home/.config/mise" "$_miserc"; then
   ok "$(t wsl.mise_ignore "$_win_home/.config/mise")"
 else
+  # shellcheck disable=SC2088 # display text
   skip "$(t wsl.mise_ignore_skip "~/.config/mise/miserc.toml" "$_win_home/.config/mise")"
 fi
 unset _win_home _miserc

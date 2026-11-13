@@ -64,7 +64,17 @@ ui_banner
 
 ## ── Step 1: base ────────────────────────────────────────────────────────────
 step "$(t step.base)"
-run "$(t base.sync)" pacman -Syu --noconfirm
+# Fresh WSL images create the pacman keyring on the first interactive login
+# (/usr/lib/wsl/first-setup.sh), so a distro installed with --no-launch has
+# none; the Docker image ships without its local signing key on purpose.
+# Either way pacman cannot verify a single package until this runs.
+init_pacman_keyring() { pacman-key --init && pacman-key --populate archlinux; }
+if ! pacman-key --list-secret-keys 2>/dev/null | grep -q '^sec'; then
+  run "$(t base.keyring_init)" init_pacman_keyring
+fi
+# Keyring first: an old image may not know the keys of newer packages yet.
+run "$(t base.keyring_update)" pacman -Sy --needed --noconfirm archlinux-keyring
+run "$(t base.sync)" pacman -Su --noconfirm
 if ((UI_INTERACTIVE)) && ! command -v gum &>/dev/null; then
   run "$(t base.gum)" pacman -S --needed --noconfirm gum || warn "$(t base.gum_fail)"
 fi

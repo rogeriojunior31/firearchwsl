@@ -1,9 +1,13 @@
-# shellcheck shell=bash disable=SC2034
+# shellcheck shell=bash disable=SC2034,SC2088
+# (SC2088: "~" in messages is display text, never expanded.)
 # name: English
 #
 # Reference catalog: every key must exist here. Other languages override keys;
 # anything they leave out falls back to this file.
 # Values are printf formats — keep the %s / %d placeholders and their order.
+
+# Declared by i18n.sh; repeated so tools know MSG is associative.
+declare -gA MSG
 
 I18N_LOCALE="en_US.UTF-8"
 I18N_LANGUAGE="en_US"
@@ -89,7 +93,9 @@ MSG[step.config]="User config"
 MSG[step.docker]="Docker"
 
 ## Base
-MSG[base.sync]="Updating the system (pacman -Syu)"
+MSG[base.sync]="Updating the system (pacman -Su)"
+MSG[base.keyring_init]="Initializing the pacman keyring"
+MSG[base.keyring_update]="Updating archlinux-keyring"
 MSG[base.gum]="Installing gum (interactive prompts)"
 MSG[base.gum_fail]="gum unavailable — falling back to plain prompts."
 

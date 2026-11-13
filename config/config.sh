@@ -30,7 +30,8 @@ ok "$(t cfg.payloads)"
 #                                             up and overwrite (FORCE_CONFIG=1)
 install_rc() {
   local src=$1 dest=$2 name="~${2#"$TARGET_HOME"}"
-  local previous="$_previous/$(basename "$src")"
+  local previous
+  previous="$_previous/$(basename "$src")"
   if [[ ! -e "$dest" ]]; then
     install -m 0644 "$src" "$dest"
     ok "$(t cfg.rc_installed "$name")"

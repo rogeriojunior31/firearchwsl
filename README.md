@@ -10,6 +10,8 @@
 
 # firearchwsl 🔥
 
+Português · **[English](README.en.md)**
+
 Bootstrap de um **Arch Linux no WSL2**: um único `bash install.sh` leva um Arch recém-instalado (só com `root`) a um ambiente de desenvolvimento completo.
 
 Você responde algumas perguntas no começo, confirma o resumo e vai tomar um café. O instalador roda sozinho até o fim, mostrando cada etapa com spinner e tempo, e guarda a saída completa num arquivo de log.
@@ -99,14 +101,44 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
 
 ## Instalação
 
-No terminal do Arch WSL, como `root`:
+### Um comando, pelo Windows
+
+No **PowerShell**:
+
+```powershell
+irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1 | iex
+```
+
+O `bootstrap.ps1` instala a distro oficial do Arch (se você ainda não tiver), baixa o firearchwsl para `/opt/firearchwsl` dentro dela, roda o instalador e reinicia a distro no final. Rodar de novo é seguro.
+
+Com opções:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1))) -Name archdev
+```
+
+| Parâmetro | Efeito |
+|-----------|--------|
+| `-Name <distro>` | Nome da distro a criar ou reaproveitar (default `archlinux`) |
+| `-Branch <branch>` | Branch a clonar (default `main`) |
+| `-Source <caminho>` | Copia um checkout local em vez de clonar |
+| `-Yes` | Pula a confirmação final do instalador |
+| `-VerboseInstall` | Saída crua dos comandos, sem spinner |
+
+As variáveis `FIREARCH_*` definidas no PowerShell (`$env:FIREARCH_USER = '...'`) são repassadas para dentro do WSL.
+
+### Manual, dentro do Arch WSL
+
+Como `root`:
 
 ```bash
-pacman -Sy --noconfirm git
+pacman -Syu --noconfirm git
 git clone https://github.com/rogeriojunior31/firearchwsl.git
 cd firearchwsl
 bash install.sh
 ```
+
+### As perguntas
 
 O instalador pergunta, tudo de uma vez:
 
@@ -238,8 +270,11 @@ Pronto: o seletor de idioma e `FIREARCH_LANG=<codigo>` passam a aceitar o novo i
 
 ```
 firearchwsl/
-├── install.sh                 # Orquestrador: sempre o ponto de entrada
+├── bootstrap.ps1              # Windows: instala a distro e roda o instalador
+├── install.sh                 # Orquestrador: sempre o ponto de entrada no Linux
 ├── logo.txt                   # Banner ASCII
+├── tests/                     # check.sh (estático) e container.sh (ponta a ponta)
+├── .github/workflows/ci.yml   # CI: os dois testes acima
 ├── install/
 │   ├── i18n/                  # Catálogos de idioma (en.sh, pt_BR.sh)
 │   ├── preflights/
@@ -333,13 +368,15 @@ run "$(t minha.chave)" as_user git clone … "$TARGET_HOME/.config/foo"
 ## Validação
 
 ```bash
-find . -name '*.sh' -exec bash -n {} \;      # sintaxe
-shellcheck -x install.sh                      # se disponível
-fish -n default/config.fish                   # rc do fish
-bash install.sh --help                        # catálogo carrega
+bash tests/check.sh       # bash -n, shellcheck, fish -n, catálogos de idioma, fins de linha
+bash tests/container.sh   # instalação completa, duas vezes, num contêiner Arch limpo (precisa de Docker)
 ```
 
-Teste completo: `wsl --unregister archlinux`, `wsl --install archlinux`, clone e rode `bash install.sh` duas vezes. A segunda execução não pode abortar.
+O `check.sh` confere também que toda chave usada no código existe no `en.sh` e que cada tradução tem as mesmas chaves e os mesmos `%s` do inglês.
+
+O CI (`.github/workflows/ci.yml`) roda os dois em todo push e pull request.
+
+Teste no WSL de verdade, sem mexer na sua distro: `.\bootstrap.ps1 -Name firearch-test -Source .` cria uma distro separada a partir do seu checkout. Depois, `wsl --unregister firearch-test`.
 
 ---
 

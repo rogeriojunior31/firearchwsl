@@ -10,7 +10,12 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 |------|-------------|
 | `install.sh` | Orchestrator and only entry point. `set -Eeuo pipefail`. Loads `lib.sh`, picks the language, runs step 1 (base sync), sources `wizard.sh`, then sources every step script from the `STEPS` array in fixed order, then `finale.sh`. |
 | `logo.txt` | ASCII banner. Printed with a color gradient at start; animated by `tte` at the end. |
-| `README.md` | User documentation (Portuguese). |
+| `bootstrap.ps1` | Windows entry point. Installs the Arch distro (`wsl --install archlinux --name`), fetches the repo into `/opt/firearchwsl` (git clone, or `-Source` local copy), runs `install.sh` as root, restarts the distro. Must stay compatible with Windows PowerShell 5.1 (no `??`, no ternary) and be saved as UTF-8 **with BOM** (5.1 reads BOM-less files as ANSI). |
+| `README.md` / `README.en.md` | User documentation (Portuguese / English). Keep both in sync. |
+| `tests/check.sh` | Static checks: `bash -n`, shellcheck, `fish -n`, i18n key/placeholder parity, LF endings. |
+| `tests/container.sh` | End-to-end: installer twice in a clean `archlinux` container + assertions. `--inside` is what CI runs. |
+| `.github/workflows/ci.yml` | Runs both tests on push to `main`, PRs and manual dispatch. |
+| `.shellcheckrc` | `external-sources=true`, `SC2034` off (globals are shared across sourced files). |
 | `.gitattributes` | Forces LF. CRLF breaks bash/fish when the repo is run from `/mnt/c`. |
 
 ## Subdirectories
@@ -46,11 +51,11 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 
 ### Testing Requirements
 
-- No CI. Before committing: `bash -n` on every changed `.sh`; `shellcheck -x` if available; `fish -n default/config.fish`.
-- `bash install.sh --help` proves the catalogs load.
-- Real validation: fresh Arch WSL + unattended run, then a second run that must not abort:
-  `FIREARCH_LANG=en FIREARCH_USER=test bash install.sh --yes`
+- Before committing: `bash tests/check.sh` (must print "all checks passed"). Without a local shellcheck: `docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable -x -S warning $(git ls-files '*.sh')`.
+- End-to-end without touching any WSL distro: `bash tests/container.sh` (Docker).
+- On real WSL without touching the user's distro: `.\bootstrap.ps1 -Name firearch-test -Source .`, then `wsl --unregister firearch-test`.
 - Spinner/TTY paths can be exercised without a terminal via `script -qec 'bash …' /dev/null`.
+- Driving WSL from PowerShell: put the Linux commands in a script file and run `wsl -d <distro> -- bash <file>`. Never build compound `bash -c "…"` strings in PowerShell: `wsl.exe` re-joins and re-splits the arguments, and command substitutions end up executed in surprising ways.
 
 ### Common Patterns
 
