@@ -1,46 +1,112 @@
 #!/bin/bash
+# firearchwsl — orchestrator. Always the entry point:  bash install.sh
+set -Eeuo pipefail
 
-# Exit immediately if a non-zero status
-set -eE
-
-# Raiz absoluta do repo — serve de base para subscripts que copiam payloads
+# Absolute repo root — base path for subscripts that copy payloads
 FIREARCH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export FIREARCH_ROOT
 
-# Paths
 FIREARCH_INSTALL="$FIREARCH_ROOT/install"
 FIREARCH_SYSTEM="$FIREARCH_ROOT/system"
 FIREARCH_CONFIG="$FIREARCH_ROOT/config"
 
-# initial package sync
-pacman -Syu --noconfirm
-
-# Preparation
-source "$FIREARCH_INSTALL/preflights/trap-errors.sh"
-source "$FIREARCH_SYSTEM/create_your_user.sh"
+# Library: i18n (t) + UI (step/run/ask_*) + target-user helpers
 source "$FIREARCH_INSTALL/preflights/lib.sh"
-ensure_target_user
-source "$FIREARCH_SYSTEM/configure_locale.sh"
-source "$FIREARCH_SYSTEM/wsl_config.sh"
-source "$FIREARCH_INSTALL/preflights/essentials_pkgs.sh"
-source "$FIREARCH_SYSTEM/configure_git_user.sh"
-source "$FIREARCH_INSTALL/preflights/repositories.sh"
-source "$FIREARCH_INSTALL/preflights/install-mise.sh"
 
-# Packaging
-source "$FIREARCH_INSTALL/pkgs/good-tools.sh"
-source "$FIREARCH_INSTALL/pkgs/tuis.sh"
-source "$FIREARCH_INSTALL/pkgs/install_langs.sh"
-source "$FIREARCH_INSTALL/pkgs/editors.sh"
-# Config
-source "$FIREARCH_CONFIG/config.sh"
-source "$FIREARCH_CONFIG/docker.sh"
+# Language: FIREARCH_LANG if given, else the default until the picker runs.
+_lang_from_env="${FIREARCH_LANG:-}"
+if ! i18n_load "${FIREARCH_LANG:-$I18N_DEFAULT_LANG}"; then
+  _bad_lang="$FIREARCH_LANG"
+  i18n_load "$I18N_DEFAULT_LANG"
+  echo "✖ $(t pre.unknown_lang "$_bad_lang" "$(i18n_available | tr '\n' ' ')")" >&2
+  exit 2
+fi
 
-## Final phase
-clear
-tte -i "$FIREARCH_ROOT/logo.txt" --frame-rate 920 laseretch
-echo
-echo "Tudo pronto dog! agora reinicie sua wsl com o comando ´wsl --terminante archlinux´ e estara tudo configurado!" | tte --frame-rate 640 wipe
+while (($#)); do
+  case "$1" in
+    -y | --yes) FIREARCH_YES=1 ;;
+    -v | --verbose) FIREARCH_VERBOSE=1 ;;
+    -h | --help)
+      t usage
+      echo
+      exit 0
+      ;;
+    *)
+      echo "✖ $(t pre.unknown_opt "$1")" >&2
+      t usage >&2
+      echo >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
-sleep 5
-exit
+if ((EUID != 0)); then
+  echo "✖ $(t pre.need_root)" >&2
+  exit 1
+fi
+if ! command -v pacman &>/dev/null; then
+  echo "✖ $(t pre.need_pacman)" >&2
+  exit 1
+fi
+
+UI_STEP_TOTAL=14
+ui_init
+source "$FIREARCH_INSTALL/preflights/trap-errors.sh"
+
+# First question of all: which language to speak.
+if [[ -z "$_lang_from_env" ]] && ((UI_INTERACTIVE)); then
+  i18n_choose
+fi
+unset _lang_from_env
+
+ui_banner
+
+## ── Step 1: base ────────────────────────────────────────────────────────────
+step "$(t step.base)"
+# Fresh WSL images create the pacman keyring on the first interactive login
+# (/usr/lib/wsl/first-setup.sh), so a distro installed with --no-launch has
+# none; the Docker image ships without its local signing key on purpose.
+# Either way pacman cannot verify a single package until this runs.
+init_pacman_keyring() { pacman-key --init && pacman-key --populate archlinux; }
+if ! pacman-key --list-secret-keys 2>/dev/null | grep -q '^sec'; then
+  run "$(t base.keyring_init)" init_pacman_keyring
+fi
+# Keyring first: an old image may not know the keys of newer packages yet.
+run "$(t base.keyring_update)" pacman -Sy --needed --noconfirm archlinux-keyring
+run "$(t base.sync)" pacman -Su --noconfirm
+if ((UI_INTERACTIVE)) && ! command -v gum &>/dev/null; then
+  run "$(t base.gum)" pacman -S --needed --noconfirm gum || warn "$(t base.gum_fail)"
+fi
+ui_detect_gum
+
+## ── Questionnaire (ask everything now; run unattended afterwards) ───────────
+source "$FIREARCH_INSTALL/preflights/wizard.sh"
+
+## ── Steps 2..14 — the order is load-bearing, do not reshuffle ───────────────
+# "<i18n title key>|<script>"
+STEPS=(
+  "step.user|$FIREARCH_SYSTEM/create_your_user.sh"
+  "step.locale|$FIREARCH_SYSTEM/configure_locale.sh"
+  "step.wsl|$FIREARCH_SYSTEM/wsl_config.sh"
+  "step.essentials|$FIREARCH_INSTALL/preflights/essentials_pkgs.sh"
+  "step.git|$FIREARCH_SYSTEM/configure_git_user.sh"
+  "step.repos|$FIREARCH_INSTALL/preflights/repositories.sh"
+  "step.mise|$FIREARCH_INSTALL/preflights/install-mise.sh"
+  "step.tools|$FIREARCH_INSTALL/pkgs/good-tools.sh"
+  "step.tuis|$FIREARCH_INSTALL/pkgs/tuis.sh"
+  "step.langs|$FIREARCH_INSTALL/pkgs/install_langs.sh"
+  "step.editors|$FIREARCH_INSTALL/pkgs/editors.sh"
+  "step.config|$FIREARCH_CONFIG/config.sh"
+  "step.docker|$FIREARCH_CONFIG/docker.sh"
+)
+
+for _entry in "${STEPS[@]}"; do
+  step "$(t "${_entry%%|*}")"
+  # shellcheck disable=SC1090
+  source "${_entry#*|}"
+done
+unset _entry
+
+## ── Finale ──────────────────────────────────────────────────────────────────
+source "$FIREARCH_INSTALL/preflights/finale.sh"

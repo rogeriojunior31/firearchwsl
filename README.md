@@ -8,115 +8,261 @@
                                                                     by Rogerio Junior
 ```
 
-# firearchwsl
+# firearchwsl 🔥
 
-Bootstrap automatizado de uma distribuição **Arch Linux rodando em WSL2**. Um único `bash install.sh` sai de um Arch recém-instalado (só com `root`) para um ambiente de desenvolvimento completo: usuário não-root no `wheel`, locale `pt_BR.UTF-8`, repositórios extras (Omarchy + Chaotic-AUR), toolchain polyglot via `mise`, uma coleção curada de CLIs/TUIs modernas, LazyVim, Doom Emacs e Docker com systemd.
+Português · **[English](README.en.md)**
 
-> Linguagem do instalador: **Português (pt_BR)**. Todos os prompts e mensagens são nessa língua.
+Bootstrap de um **Arch Linux no WSL2**: um único `bash install.sh` leva um Arch recém-instalado (só com `root`) a um ambiente de desenvolvimento completo.
+
+Você responde algumas perguntas no começo, confirma o resumo e vai tomar um café. O instalador roda sozinho até o fim, mostrando cada etapa com spinner e tempo, e guarda a saída completa num arquivo de log.
+
+> O instalador é **multilíngue** (Português e English hoje). O código e os comentários são em inglês; todo texto de tela vem de catálogos em `install/i18n/`.
 
 ---
 
 ## Sumário
 
+- [Como fica na tela](#como-fica-na-tela)
 - [O que você ganha](#o-que-você-ganha)
 - [Pré-requisitos](#pré-requisitos)
 - [Instalação](#instalação)
-- [O que o instalador faz (em ordem)](#o-que-o-instalador-faz-em-ordem)
+- [Modo não-interativo](#modo-não-interativo)
+- [Opções e variáveis](#opções-e-variáveis)
+- [Etapas do instalador](#etapas-do-instalador)
+- [Idiomas (i18n)](#idiomas-i18n)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Pacotes instalados](#pacotes-instalados)
-- [Variáveis de ambiente / flags](#variáveis-de-ambiente--flags)
-- [Idempotência e re-runs](#idempotência-e-re-runs)
-- [Contribuindo / estendendo](#contribuindo--estendendo)
-- [Validação e testes](#validação-e-testes)
+- [Re-execução](#re-execução)
+- [Estendendo](#estendendo)
+- [Validação](#validação)
 - [Troubleshooting](#troubleshooting)
 - [Créditos](#créditos)
 
 ---
 
+## Como fica na tela
+
+```
+  ╭─ Resumo da instalação
+  │  Usuário ......... fulano
+  │  Senha ........... definida
+  │  Git ............. Fulano <fulano@exemplo.com>
+  │  Hostname ........ meuarch
+  │  Shell padrão .... fish
+  │  Linguagens ...... sim
+  │  LazyVim ......... sim
+  │  Doom Emacs ...... não
+  │  Docker .......... sim
+  ╰─
+
+━━ [02/14] Usuário e sudo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✔ Instalando sudo (2s)
+  ✔ Criando usuário 'fulano' (grupo wheel) (0s)
+  ✔ Senha definida para 'fulano'.
+  ✔ sudo liberado para o grupo wheel.
+
+━━ [09/14] Ferramentas de linha de comando ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ⠹ Instalando CLIs e fontes (35 pacotes) (41s) downloading starship...
+```
+
+- **Spinner** com tempo decorrido e a última linha do log ao lado.
+- **✔ / ⚠ / ↷ / ✖** para feito, aviso, pulado e erro.
+- Em caso de erro: etapa, comando, as últimas linhas do log e como retomar.
+- No final: resumo, avisos acumulados e os próximos passos.
+
+---
+
 ## O que você ganha
 
-- Usuário não-root no grupo `wheel` com `sudo` liberado.
-- Locale `pt_BR.UTF-8` gerado e configurado (`LANG`, `LANGUAGE`).
-- Git global já configurado (nome, email, `init.defaultBranch=main`, `pull.rebase=true`, aliases `co/br/ci/st`).
-- Repositórios **Omarchy** e **Chaotic-AUR** ativos no `pacman.conf`.
-- **mise** como gerenciador de versões polyglot (Python, Node, Bun, Rust, Go — todos em `latest`).
-- **Shells**: `bash` + `fish` com `rc` prontos (PATH, aliases, histórico, inits de `starship`/`zoxide`/`atuin`/`mise`/`fzf`).
-- **Prompt**: `starship` com preset nerd-font e paleta `tokyonight`.
-- **Editores**: **LazyVim** (em `~/.config/nvim`) e **Doom Emacs** (em `~/.emacs.d`) clonados e instalados.
-- **TUIs**: `lazygit`, `lazydocker`, `yazi` (com preview stack completo), `zellij`, `taskwarrior-tui`, `tabiew`, `television`, `navi`, `superfile`, `atuin`, `fzf`.
-- **CLIs modernas**: `eza`, `bat`, `fd`, `ripgrep`, `jq`, `yq`, `dust`, `zoxide`, `glow`, `tldr`, `fastfetch`, `7zip`…
-- **Docker** + `docker-buildx` + `docker-compose`, `daemon.json` customizado (log cap 10MB/5 files, bridge `172.17.0.1/16`), `systemd-resolved` drop-in, serviço habilitado.
-- Banner final animado pelo `tte` (terminaltexteffects) ao concluir.
+- Usuário não-root no grupo `wheel`, com `sudo`, e já definido como **usuário padrão do WSL**.
+- Locale do idioma escolhido (`pt_BR.UTF-8` ou `en_US.UTF-8`) gerado e configurado.
+- Git global configurado (nome, email, `init.defaultBranch=main`, `pull.rebase=true`, aliases `co/br/ci/st`).
+- Repositórios **Omarchy** e **Chaotic-AUR** ativos.
+- **mise** com Python, Node, Bun, Rust e Go em `latest` *(opcional)*.
+- **Shells**: `bash` e `fish` prontos (PATH, aliases, histórico, `starship`/`zoxide`/`atuin`/`mise`/`fzf`). Você escolhe qual é o padrão.
+- **Prompt**: `starship` com nerd-font e paleta `tokyonight`.
+- **Editores**: **LazyVim** e **Doom Emacs** *(opcionais)*.
+- **TUIs**: `lazygit`, `lazydocker`, `yazi` (com previews), `zellij`, `taskwarrior-tui`, `tabiew`, `television`, `navi`, `superfile`, `atuin`, `fzf`.
+- **CLIs**: `eza`, `bat`, `fd`, `ripgrep`, `jq`, `yq`, `dust`, `zoxide`, `glow`, `gum`, `tldr`, `fastfetch`, `7zip`…
+- **Docker** nativo com `buildx` e `compose`, logs limitados e serviço habilitado *(opcional)*.
 
 ---
 
 ## Pré-requisitos
 
-- Windows 10/11 com **WSL2** habilitado.
-- Uma distro **Arch Linux WSL** recém-criada (use a imagem oficial do Arch no WSL ou equivalente).
-- Conexão com internet.
-- Acesso como **`root`** para o primeiro run (o instalador é quem cria o usuário não-root).
+- Windows 10/11 com **WSL2**.
+- Uma distro **Arch Linux** recém-criada: `wsl --install archlinux`.
+- Internet.
+- Rodar como **`root`** (é o padrão de um Arch WSL novo).
 
-> Não é recomendado rodar em cima de um Arch WSL já customizado — o script assume estado inicial limpo e sobrescreve `/etc/pacman.conf`, `/etc/pacman.d/mirrorlist`, `/etc/locale.conf`, `/etc/docker/daemon.json`, entre outros.
+> Não é recomendado rodar em cima de um Arch WSL já customizado: o instalador reescreve `/etc/pacman.d/mirrorlist` e `/etc/locale.conf`, e edita `/etc/pacman.conf` e `/etc/wsl.conf`.
 
 ---
 
 ## Instalação
 
-Do terminal do Arch WSL, como `root`:
+### Um comando, pelo Windows
+
+No **PowerShell**:
+
+```powershell
+irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1 | iex
+```
+
+O `bootstrap.ps1` instala a distro oficial do Arch (se você ainda não tiver), baixa o firearchwsl para `/opt/firearchwsl` dentro dela, roda o instalador e reinicia a distro no final. Rodar de novo é seguro.
+
+Com opções:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1))) -Name archdev
+```
+
+| Parâmetro | Efeito |
+|-----------|--------|
+| `-Name <distro>` | Nome da distro a criar ou reaproveitar (default `archlinux`) |
+| `-Branch <branch>` | Branch a clonar (default `main`) |
+| `-Source <caminho>` | Copia um checkout local em vez de clonar |
+| `-Yes` | Pula a confirmação final do instalador |
+| `-VerboseInstall` | Saída crua dos comandos, sem spinner |
+
+As variáveis `FIREARCH_*` definidas no PowerShell (`$env:FIREARCH_USER = '...'`) são repassadas para dentro do WSL.
+
+### Manual, dentro do Arch WSL
+
+Como `root`:
 
 ```bash
-# 1. Clone o repo
-git clone https://github.com/<seu-user>/firearchwsl.git
+pacman -Syu --noconfirm git
+git clone https://github.com/rogeriojunior31/firearchwsl.git
 cd firearchwsl
-
-# 2. Rode o bootstrap
 bash install.sh
 ```
 
-Durante o run, o instalador irá pedir, nessa ordem:
+### As perguntas
 
-1. **Username** do novo usuário não-root (vai pro grupo `wheel` com `sudo`).
-2. **Senha** desse usuário (prompt do `passwd`).
-3. **Nome** e **email** para o `git config --global`.
+O instalador pergunta, tudo de uma vez:
 
-Depois disso é "sit back and relax" — a instalação demora (principalmente o Doom Emacs, que recompila pacotes: 5–15 min).
+1. **Idioma** do instalador.
+2. **Usuário** Linux a criar. Contas do sistema (`root`, `bin`, `http`…) e nomes inválidos são recusados na hora.
+3. **Senha** do usuário, digitada duas vezes. Não pode ficar vazia: é a senha do `sudo`.
+4. **Nome** e **email** do Git (pode deixar vazio para pular).
+5. **Hostname** da distro. Enter mantém o nome da máquina Windows.
+6. **Shell padrão**: `bash` ou `fish`.
+7. **Componentes opcionais**: linguagens, LazyVim, Doom Emacs, Docker.
 
-Ao terminar, o instalador mostra um banner animado e pede para você rodar no PowerShell:
+Depois ele mostra o resumo e pede confirmação:
+
+- **Sim** começa a instalação, que segue sozinha até o fim.
+- **Não** volta ao formulário com as respostas já preenchidas, para você corrigir só o que quiser (a senha é pedida de novo).
+- **Ctrl+C** cancela sem mudar nada além da atualização da base.
+
+Ao terminar, reinicie a distro no **PowerShell**:
 
 ```powershell
 wsl --terminate archlinux
 ```
 
-Isso derruba a distro para que os novos grupos (`wheel`, `docker`) e o locale entrem em vigor. Abra o WSL de novo e você já loga como o usuário criado.
+Abra o WSL de novo e você já entra como o usuário criado.
 
 ---
 
-## O que o instalador faz (em ordem)
+## Modo não-interativo
 
-O `install.sh` é um **orquestrador** que usa `source` para rodar cada script no contexto correto. A ordem é load-bearing:
+Toda pergunta tem uma variável de ambiente equivalente. Com elas e `--yes`, nada é perguntado:
 
-| Fase | Script | Responsabilidade |
-|------|--------|------------------|
-| 0 | `pacman -Syu` inicial | Atualiza a base antes de qualquer coisa |
-| 1 | `install/preflights/trap-errors.sh` | Instala `ERR trap` com mensagem útil |
-| 2 | `system/create_your_user.sh` | Cria usuário, adiciona ao `wheel`, libera `sudo`, grava `/etc/firearchwsl/target_user` |
-| 3 | `install/preflights/lib.sh` + `ensure_target_user` | Exporta `TARGET_USER` / `TARGET_HOME` e define `as_user` para tudo que vem depois |
-| 4 | `system/configure_locale.sh` | Gera `pt_BR.UTF-8` + `en_US.UTF-8`, escreve `/etc/locale.conf` |
-| 5 | `system/wsl_config.sh` | Symlink de `libedit` (shim WSL) |
-| 6 | `install/preflights/essentials_pkgs.sh` | `sudo base-devel git fish btop curl wget just make eza bat openssh vim` |
-| 7 | `system/configure_git_user.sh` | `git config --global` user/email + aliases |
-| 8 | `install/preflights/repositories.sh` | Ativa Color/ILoveCandy, adiciona Omarchy + Chaotic-AUR, força mirrorlist |
-| 9 | `install/preflights/install-mise.sh` | Instala `mise` e ativa no rc |
-| 10 | `install/pkgs/good-tools.sh` | ~40 pacotes pacman (CLIs, fonts nerd, `yay`/`paru`, `tte`) |
-| 11 | `install/pkgs/tuis.sh` | TUIs + stack de preview do yazi |
-| 12 | `install/pkgs/install_langs.sh` | `mise use -g python@latest node@latest bun@latest rust@latest go@latest` |
-| 13 | `install/pkgs/editors.sh` | Clona LazyVim starter e Doom Emacs |
-| 14 | `config/config.sh` | Copia `config_files/*` e `default/*` pro home do `TARGET_USER`, `chown -R` |
-| 15 | `config/docker.sh` | Escreve `/etc/docker/daemon.json`, drop-in do `systemd-resolved`, habilita `docker` |
-| ∎ | `tte` | Renderiza `logo.txt` + instrução final |
+```bash
+FIREARCH_LANG=pt_BR \
+FIREARCH_USER=fulano FIREARCH_PASSWORD='s3nha' \
+FIREARCH_GIT_NAME='Fulano' FIREARCH_GIT_EMAIL='fulano@exemplo.com' \
+FIREARCH_SHELL=fish FIREARCH_SKIP=doom \
+bash install.sh --yes
+```
 
-> **Importante:** cada subscript assume o contexto do orquestrador. Eles *não* são standalone — scripts user-scoped fazem `: "${TARGET_USER:?…}"` para explodir cedo se invocados fora.
+Sem terminal (CI, `wsl -- bash install.sh` capturado), o spinner é desligado e cada comando vira uma linha `✔`/`✖`.
+
+Nesse modo, um usuário novo **exige** `FIREARCH_PASSWORD`: sem ela o instalador para antes de mudar qualquer coisa. Nunca é criado usuário sem senha.
+
+Os prompts leem direto do terminal (`/dev/tty`), então continuam funcionando mesmo se a entrada padrão for um pipe.
+
+---
+
+## Opções e variáveis
+
+| Opção | Efeito |
+|-------|--------|
+| `-y`, `--yes` | Não pede a confirmação final do resumo |
+| `-v`, `--verbose` | Mostra a saída crua dos comandos, sem spinner |
+| `-h`, `--help` | Ajuda |
+
+| Variável | Efeito |
+|----------|--------|
+| `FIREARCH_LANG` | Idioma do instalador: `pt_BR`, `en` |
+| `FIREARCH_USER` | Usuário Linux a criar |
+| `FIREARCH_PASSWORD` | Senha do usuário (obrigatória sem terminal, se o usuário for novo) |
+| `FIREARCH_GIT_NAME` / `FIREARCH_GIT_EMAIL` | Identidade do Git |
+| `FIREARCH_HOSTNAME` | Hostname da distro. Default: o nome da máquina Windows |
+| `FIREARCH_SHELL` | Shell padrão: `bash` (default) ou `fish` |
+| `FIREARCH_SKIP` | Componentes a pular: `langs`, `lazyvim`, `doom`, `docker` (separe por vírgula) |
+| `FIREARCH_MISE_TOOLS` | Toolchains do mise. Default: `python node bun rust go` |
+| `FIREARCH_VERBOSE=1` | Igual a `--verbose` |
+| `FIREARCH_LOG` | Caminho do log. Default: `/var/log/firearchwsl/install-<data>.log` |
+| `FORCE_CONFIG=1` | Sobrescreve `~/.bashrc` e `config.fish` (com backup `.bak-<data>`) |
+| `DISABLE_CHAOTIC=1` | Não adiciona o Chaotic-AUR |
+| `NO_COLOR=1` | Desliga as cores |
+| `FIREARCH_NO_GUM=1` | Prompts simples (`read`) em vez do `gum` |
+
+---
+
+## Etapas do instalador
+
+O `install.sh` é um orquestrador que dá `source` em cada script. **A ordem importa.**
+
+| # | Etapa | Script | O que faz |
+|---|-------|--------|-----------|
+| 1 | Base | `install.sh` | `pacman -Syu`; instala `gum` para os prompts |
+| — | Questionário | `install/preflights/wizard.sh` | Pergunta tudo, mostra o resumo, confirma ou volta para corrigir |
+| 2 | Usuário e sudo | `system/create_your_user.sh` | Cria o usuário no `wheel` com a senha escolhida, drop-in em `/etc/sudoers.d` |
+| 3 | Locale | `system/configure_locale.sh` | Gera `en_US.UTF-8` e o locale do idioma escolhido (pula se já existem) |
+| 4 | WSL | `system/wsl_config.sh` | `/etc/wsl.conf`: usuário padrão, hostname, systemd; mise ignora a config do Windows; shim do `libedit` |
+| 5 | Essenciais | `install/preflights/essentials_pkgs.sh` | `base-devel`, `git`, `fish`, `curl`… |
+| 6 | Git | `system/configure_git_user.sh` | `git config --global` |
+| 7 | Repositórios | `install/preflights/repositories.sh` | Mirrors (com backup), Chaotic-AUR, Omarchy por último, `pacman -Syu` |
+| 8 | mise | `install/preflights/install-mise.sh` | Instala o `mise` |
+| 9 | CLIs | `install/pkgs/good-tools.sh` | CLIs, fontes, `yay`/`paru` |
+| 10 | TUIs | `install/pkgs/tuis.sh` | TUIs e previews do yazi |
+| 11 | Linguagens | `install/pkgs/install_langs.sh` | `mise use -g <tool>@latest` *(opcional)* |
+| 12 | Editores | `install/pkgs/editors.sh` | LazyVim e Doom Emacs *(opcionais)* |
+| 13 | Configs | `config/config.sh` | rc files, starship, shell padrão |
+| 14 | Docker | `config/docker.sh` | Pacotes, `daemon.json`, grupo, serviço *(opcional)* |
+| ∎ | Final | `install/preflights/finale.sh` | Logo animado (`tte`), resumo, próximos passos |
+
+---
+
+## Idiomas (i18n)
+
+Nenhum script tem texto de tela fixo. Tudo passa pela função `t`:
+
+```bash
+ok "$(t user.exists "$username")"
+```
+
+Os catálogos ficam em `install/i18n/<idioma>.sh` e preenchem o array `MSG`:
+
+```bash
+MSG[user.exists]="Usuário '%s' já existe — seguindo."
+```
+
+- `en.sh` é a **referência**: toda chave existe nele.
+- Os outros idiomas só sobrescrevem. Chave faltando cai no inglês.
+- Cada catálogo também define `I18N_LOCALE` (o locale do sistema) e o padrão de "sim/não".
+
+**Para adicionar um idioma:**
+
+1. Copie `install/i18n/en.sh` para `install/i18n/<codigo>.sh` (ex.: `es.sh`).
+2. Troque o cabeçalho `# name:` (é o nome que aparece no seletor) e as variáveis `I18N_*`.
+3. Traduza os valores, mantendo os `%s` / `%d` na mesma ordem.
+
+Pronto: o seletor de idioma e `FIREARCH_LANG=<codigo>` passam a aceitar o novo idioma sem mexer em mais nada.
 
 ---
 
@@ -124,152 +270,113 @@ O `install.sh` é um **orquestrador** que usa `source` para rodar cada script no
 
 ```
 firearchwsl/
-├── install.sh                 # Orquestrador — sempre o ponto de entrada
-├── logo.txt                   # ASCII banner renderizado pelo tte no final
-├── AGENTS.md                  # Documentação hierárquica para AI/agents (raiz)
-│
+├── bootstrap.ps1              # Windows: instala a distro e roda o instalador
+├── install.sh                 # Orquestrador: sempre o ponto de entrada no Linux
+├── logo.txt                   # Banner ASCII
+├── tests/                     # check.sh (estático) e container.sh (ponta a ponta)
+├── .github/workflows/ci.yml   # CI: os dois testes acima
 ├── install/
-│   ├── preflights/            # Trap de erros, essentials, repos, mise, lib.sh
+│   ├── i18n/                  # Catálogos de idioma (en.sh, pt_BR.sh)
+│   ├── preflights/
+│   │   ├── lib.sh             # Carrega i18n + ui; helpers do usuário-alvo (as_user)
+│   │   ├── i18n.sh            # t, i18n_load, seletor de idioma
+│   │   ├── ui.sh              # step, run (spinner), prompts, log
+│   │   ├── trap-errors.sh     # Tela de erro
+│   │   ├── wizard.sh          # Questionário inicial
+│   │   ├── finale.sh          # Tela final
+│   │   ├── essentials_pkgs.sh · repositories.sh · install-mise.sh
 │   └── pkgs/                  # good-tools, tuis, install_langs, editors
-│
-├── system/                    # Scripts que tocam /etc ou criam user/groups
-│   ├── create_your_user.sh    # Cria usuário, libera wheel/sudo
-│   ├── configure_locale.sh    # pt_BR.UTF-8 + en_US.UTF-8
-│   ├── configure_git_user.sh  # git config --global
-│   └── wsl_config.sh          # libedit shim
-│
-├── config/                    # Pós-install: copia payloads + Docker
-│   ├── config.sh              # Copia config_files/ e default/ pro home
-│   └── docker.sh              # daemon.json + systemd-resolved + enable
-│
-├── config_files/              # Payloads opacos (copiados verbatim)
-│   └── starship.toml
-│
-└── default/                   # RCs default de shell
-    ├── bashrc                 # → ~/.bashrc
-    ├── config.fish            # → ~/.config/fish/config.fish
-    └── inputrc                # readline
+├── system/                    # Usuário, locale, git, wsl.conf
+├── config/                    # rc files do usuário + Docker
+├── config_files/              # Payloads copiados como estão (starship.toml)
+└── default/                   # bashrc, config.fish, inputrc
 ```
 
-Cada subdiretório tem seu próprio `AGENTS.md` com detalhes de contrato, ordem, testes e padrões.
+Cada diretório tem um `AGENTS.md` com contratos, ordem e armadilhas.
 
 ---
 
 ## Pacotes instalados
 
-### Pacman — essentials (`essentials_pkgs.sh`)
-`sudo` · `base-devel` · `git` · `fish` · `btop` · `curl` · `wget` · `just` · `make` · `eza` · `bat` · `openssh` · `vim`
+**Essenciais** — `sudo` · `base-devel` · `diffutils` · `git` · `fish` · `btop` · `curl` · `wget` · `just` · `make` · `eza` · `bat` · `openssh` · `vim`
 
-### Pacman — good-tools (`good-tools.sh`)
-`jq` · `yq` · `stow` · `fx` · `fd` · `ripgrep` · `7zip` · `zip` · `unzip` · `task` · `zellij` · `neovim` · `glow` · `harper` · `figlet` · `asciinema` · `docker` · `docker-buildx` · `docker-compose` · `dust` · `less` · `man` · `starship` · `tldr` · `tree-sitter-cli` · `zoxide` · `cargo` · `python-poetry-core` · `python-terminaltexteffects` · `bash-completion` · `yay` · `paru` · `luarocks` · `ttf-cascadia-mono-nerd` · `ttf-jetbrains-mono` · `ttf-hack-nerd` · `fastfetch` · `emacs`
+**CLIs e fontes** — `jq` · `yq` · `stow` · `fx` · `fd` · `ripgrep` · `7zip` · `zip` · `unzip` · `task` · `zellij` · `neovim` · `glow` · `gum` · `harper` · `figlet` · `asciinema` · `dust` · `less` · `man-db` · `starship` · `tldr` · `tree-sitter-cli` · `zoxide` · `python-poetry-core` · `python-terminaltexteffects` · `bash-completion` · `yay` · `paru` · `luarocks` · `ttf-cascadia-mono-nerd` · `ttf-jetbrains-mono` · `ttf-hack-nerd` · `fastfetch`
 
-### Pacman — TUIs (`tuis.sh`)
-`taskwarrior-tui` · `tabiew` · `lazygit` · `television` · `navi` · `yazi` · `imagemagick` · `poppler` · `fzf` · `atuin` · `rsync` · `chafa` · `resvg` · `ffmpegthumbnailer` · `libcaca` · `lynx` · `mediainfo` · `odt2txt` · `perl-image-exiftool` · `python-pillow` · `python-chardet` · `ueberzug` · `w3m` · `lazydocker` · `superfile`
+**TUIs** — `taskwarrior-tui` · `tabiew` · `lazygit` · `television` · `navi` · `yazi` · `imagemagick` · `poppler` · `fzf` · `atuin` · `rsync` · `chafa` · `resvg` · `ffmpegthumbnailer` · `libcaca` · `lynx` · `mediainfo` · `odt2txt` · `perl-image-exiftool` · `python-pillow` · `python-chardet` · `ueberzug` · `w3m` · `lazydocker` · `superfile`
 
-### mise — toolchains (`install_langs.sh`)
-`python@latest` · `node@latest` · `bun@latest` · `rust@latest` · `go@latest`
+**Opcionais** — mise: `python` `node` `bun` `rust` `go` · `emacs` + Doom · LazyVim · `docker` `docker-buildx` `docker-compose`
 
-### Editores (`editors.sh`)
-- **LazyVim** starter → `~/.config/nvim`
-- **Doom Emacs** → `~/.emacs.d` (roda `doom install --no-fonts --no-hooks --yes`)
+O Rust vem do mise. Se você pular as linguagens (ou tirar `rust` de `FIREARCH_MISE_TOOLS`), o instalador põe o `rust` do pacman no lugar, para o `cargo` continuar existindo.
 
----
+Um pacote que sumiu dos repositórios não derruba mais o grupo inteiro: ele é pulado e vira um aviso no resumo final.
 
-## Variáveis de ambiente / flags
+### Repositórios
 
-Podem ser exportadas **antes** de rodar `bash install.sh`:
+- **Chaotic-AUR** (assinado) entra antes do **Omarchy**. O Omarchy não tem assinatura (`SigLevel = Optional TrustAll`), então fica por último: o pacman pega cada pacote do primeiro repositório que o tem, e assim o Omarchy só entrega o que nenhum repositório assinado oferece (hoje, o `python-terminaltexteffects`).
+- O `mirrorlist` original fica guardado em `/etc/pacman.d/mirrorlist.firearchwsl.bak`.
 
-| Variável | Efeito |
-|----------|--------|
-| `DISABLE_CHAOTIC=1` | Pula instalação do Chaotic-AUR (útil em ARM ou redes restritas) |
-| `FORCE_CONFIG=1` | Força `config/config.sh` a sobrescrever `~/.bashrc` e `~/.config/fish/config.fish`. Default é preservar (`cp -n`) |
+### mise e o home do Windows
 
-Variáveis **exportadas pelo próprio instalador** (úteis ao adicionar novos scripts):
-
-| Variável | Origem | Conteúdo |
-|----------|--------|----------|
-| `FIREARCH_ROOT` | `install.sh` | Caminho absoluto da raiz do repo |
-| `FIREARCH_INSTALL` | `install.sh` | `$FIREARCH_ROOT/install` |
-| `FIREARCH_SYSTEM` | `install.sh` | `$FIREARCH_ROOT/system` |
-| `FIREARCH_CONFIG` | `install.sh` | `$FIREARCH_ROOT/config` |
-| `TARGET_USER` | `lib.sh::ensure_target_user` | Usuário não-root alvo |
-| `TARGET_HOME` | `lib.sh::ensure_target_user` | `$HOME` do `TARGET_USER` |
+O WSL abre em `/mnt/c/Users/<você>`, e o mise procura configs subindo a partir da pasta atual: sem ajuste, ele leria o `~/.config/mise` do **Windows** e listaria aquelas ferramentas como `missing`. O instalador cria `~/.config/mise/miserc.toml` ignorando só essa pasta; o `mise.toml` dos seus projetos em `/mnt/c` continua valendo.
 
 ---
 
-## Idempotência e re-runs
+## Re-execução
 
-O instalador foi desenhado para ser **re-executável**:
+O instalador pode ser rodado de novo com segurança:
 
-- `pacman -S --needed --noconfirm` evita reinstalação.
-- `create_your_user.sh` pula o prompt se `/etc/firearchwsl/target_user` já existe.
-- Edits em `/etc/pacman.conf` são guardados com `grep -q` antes de escrever.
-- `editors.sh` só clona se os diretórios ainda não existem.
-- `config/config.sh` **preserva** `~/.bashrc` e `config.fish` existentes por default (`cp -n`). Use `FORCE_CONFIG=1` para sobrescrever.
-- Ativação do `mise` no rc usa `grep -Fq` antes de append.
+- `pacman -S --needed` não reinstala nada.
+- O usuário fica registrado em `/etc/firearchwsl/target_user`: não é perguntado de novo.
+- Edições em `/etc/pacman.conf` e `/etc/wsl.conf` não duplicam.
+- LazyVim e Doom só são instalados se ainda não existem.
+- `~/.bashrc` e `config.fish` que você **não editou** são atualizados para a versão nova do repositório. Os que **têm edições suas** são preservados; `FORCE_CONFIG=1` sobrescreve, guardando um backup.
+- `/etc/pacman.conf` é reorganizado para o Omarchy ficar por último, inclusive em instalações antigas.
+- `/etc/docker/daemon.json` existente é preservado.
 
-**Atenção:** não há rollback automático. Falha no meio do pipeline deixa o sistema em estado parcial — re-rode após corrigir.
+Não há rollback: se uma etapa falhar, corrija e rode de novo.
 
 ---
 
-## Contribuindo / estendendo
+## Estendendo
 
-### Adicionar um novo grupo de pacotes
-
-1. Crie `install/pkgs/<nome>.sh` modelado em `good-tools.sh` (shebang, `set -Eeuo pipefail`, `PACMAN_PKGS=()`, `msg`/`warn`/`die`, `ensure_sudo`, `main`, `main "$@"`).
-2. Adicione `source "$FIREARCH_INSTALL/pkgs/<nome>.sh"` no `install.sh` no slot de fase correto.
-3. Mantenha o array **estreito** (um intent por arquivo). Não funda grupos.
-
-### Adicionar um comando user-scoped
-
-Use sempre o helper `as_user` de `install/preflights/lib.sh`:
+**Novo grupo de pacotes** — crie `install/pkgs/<nome>.sh`:
 
 ```bash
-as_user mise use -g rust@latest
-as_user git clone … "$TARGET_HOME/.config/foo"
+#!/bin/bash
+PACMAN_PKGS=("pacote-a" "pacote-b")
+pac_install "$(t meugrupo.install)" "${PACMAN_PKGS[@]}"
 ```
 
-Nunca use `$HOME` ou `$USER` diretamente — o script roda como root, então esses apontam pra `/root`.
+Adicione a chave `meugrupo.install` e o título `step.meugrupo` em `install/i18n/en.sh` (e nos outros idiomas), inclua a linha no array `STEPS` do `install.sh` e some 1 em `UI_STEP_TOTAL`.
 
-### Adicionar um payload opaco
+**Comando como o usuário** — use sempre `as_user`; `$HOME` e `$USER` são do root:
 
-Drop em `config_files/`. Ele será copiado para `~/.local/share/firearchwsl/config/<arquivo>`. Para torná-lo ativo, aponte uma env var (`STARSHIP_CONFIG=…` etc.) em `default/bashrc` **e** `default/config.fish` — mantenha paridade entre os dois shells.
+```bash
+run "$(t minha.chave)" as_user git clone … "$TARGET_HOME/.config/foo"
+```
 
-### Convenções de estilo
+**Convenções**
 
-- `#!/bin/bash` em todo script. Novos scripts começam com `set -Eeuo pipefail`; `install.sh` usa `set -eE` (para o trap `ERR`).
-- Strings user-facing em **pt_BR**.
-- Log helpers `msg` / `warn` / `die` vivem em `install/preflights/lib.sh` — prefira-os ao escrever scripts novos.
-- Scripts root-required guardam com `if [[ $EUID -ne 0 ]]; then ... return 1 2>/dev/null || exit 1; fi` (porque são `source`d).
+- Código, variáveis e comentários em **inglês**.
+- Texto de tela **só** via `t` + catálogo.
+- Comando demorado sempre dentro de `run "rótulo" …`.
+- Etapa não-fatal: `run … || warn "$(t …)"`. O aviso reaparece no resumo final.
+- Scripts são `source`d: use `return`, nunca `exit`, para sair cedo.
 
 ---
 
-## Validação e testes
-
-Não há CI nem suíte de testes. Validação é manual:
+## Validação
 
 ```bash
-# Lint estático
-bash -n install.sh
-find . -name '*.sh' -exec bash -n {} \;
-shellcheck -x install.sh      # se disponível
-
-# Validar fish rc
-fish -n default/config.fish
-
-# Smoke test do helper as_user (fora do install.sh)
-source install/preflights/lib.sh
-TARGET_USER=$(whoami) TARGET_HOME=$HOME as_user whoami
-# → deve imprimir seu usuário
+bash tests/check.sh       # bash -n, shellcheck, fish -n, catálogos de idioma, fins de linha
+bash tests/container.sh   # instalação completa, duas vezes, num contêiner Arch limpo (precisa de Docker)
 ```
 
-**Teste de fumaça completo:** `wsl --unregister archlinux && wsl --install -d archlinux`, clone o repo e rode `bash install.sh` duas vezes. Segundo run não deve abortar.
+O `check.sh` confere também que toda chave usada no código existe no `en.sh` e que cada tradução tem as mesmas chaves e os mesmos `%s` do inglês.
 
-Teste em container (parcial — pula `docker.sh` onde não há systemd):
+O CI (`.github/workflows/ci.yml`) roda os dois em todo push e pull request.
 
-```bash
-docker run --rm -it archlinux bash
-```
+Teste no WSL de verdade, sem mexer na sua distro: `.\bootstrap.ps1 -Name firearch-test -Source .` cria uma distro separada a partir do seu checkout. Depois, `wsl --unregister firearch-test`.
 
 ---
 
@@ -277,21 +384,21 @@ docker run --rm -it archlinux bash
 
 | Sintoma | Causa provável | Resolução |
 |---------|----------------|-----------|
-| `Failed to install Chaotic-AUR` | Rede bloqueia `cdn-mirror.chaotic.cx` ou arch não é `x86_64` | Re-rodar com `DISABLE_CHAOTIC=1 bash install.sh` |
-| `bind: ~/.local/share/omarchy/default/bash/inputrc: No such file` ao abrir bash | `bashrc` ainda referencia Omarchy. Drift conhecido | Instalar Omarchy *ou* editar `default/bashrc` linha 1 |
-| `docker` não roda sem `sudo` para o usuário | `docker.sh` adiciona `${USER}` (root) ao grupo | Após install: `sudo usermod -aG docker <seu-user>` + `wsl --terminate archlinux` |
-| `locale -a` não mostra `pt_BR.utf8` | `locale-gen` falhou silenciosamente | `sudo locale-gen` manualmente, verificar `/etc/locale.gen` |
-| Doom Emacs trava / reclama | Download interrompido | `DOOMLOCALDIR=~/.emacs.d/.local ~/.emacs.d/bin/doom doctor` |
-| Re-run sobrescreveu meu `.bashrc` customizado | Usou `FORCE_CONFIG=1` | Default é preservar — não passe essa flag |
+| Aviso "Chaotic-AUR falhou" | Rede bloqueia o keyserver ou `cdn-mirror.chaotic.cx` | Rode de novo, ou use `DISABLE_CHAOTIC=1` |
+| Aviso "Não encontrado em nenhum repositório" | O pacote vem do Chaotic-AUR, que não foi ativado, ou mudou de nome | Resolva o Chaotic-AUR ou corrija o nome no array |
+| "Um usuário novo precisa de senha" | Rodou sem terminal e sem `FIREARCH_PASSWORD` | Rode num terminal, ou passe `FIREARCH_PASSWORD` |
+| Esqueci a senha do usuário | — | `wsl -d archlinux -u root passwd <usuario>` |
+| Hostname novo não aparece | O WSL só aplica no próximo start | `wsl --terminate archlinux` |
+| WSL ainda abre como root | A distro não foi reiniciada | `wsl --terminate archlinux` no PowerShell |
+| `docker` exige `sudo` | O grupo `docker` só vale após novo login | `wsl --terminate archlinux` |
+| Ícones do prompt aparecem como quadrados | Terminal sem Nerd Font | Configure uma Nerd Font no Windows Terminal |
+| Doom Emacs com erro | Download interrompido | `~/.emacs.d/bin/doom doctor` e `doom sync` |
+| Quero ver tudo que aconteceu | — | `less /var/log/firearchwsl/install-*.log` |
 
 ---
 
 ## Créditos
 
 - **Autor:** Rogerio Junior
-- **Inspirações:** [Omarchy](https://pkgs.omarchy.org/), [Chaotic-AUR](https://aur.chaotic.cx/), [LazyVim](https://www.lazyvim.org/), [Doom Emacs](https://github.com/doomemacs/doomemacs), [mise](https://mise.jdx.dev/), [starship](https://starship.rs/), [yazi](https://yazi-rs.github.io/).
-- **Banner final:** [terminaltexteffects](https://github.com/ChrisBuilds/terminaltexteffects) (`tte`).
-
----
-
-> Dúvidas sobre arquitetura interna? Leia os `AGENTS.md` hierárquicos em cada diretório — eles documentam contratos, ordem de execução, testes e armadilhas conhecidas.
+- **Inspirações:** [Omarchy](https://omarchy.org/), [Chaotic-AUR](https://aur.chaotic.cx/), [LazyVim](https://www.lazyvim.org/), [Doom Emacs](https://github.com/doomemacs/doomemacs), [mise](https://mise.jdx.dev/), [starship](https://starship.rs/), [yazi](https://yazi-rs.github.io/).
+- **Interface:** [gum](https://github.com/charmbracelet/gum) e [terminaltexteffects](https://github.com/ChrisBuilds/terminaltexteffects).

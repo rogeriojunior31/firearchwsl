@@ -1,6 +1,6 @@
 #!/bin/bash
-
-set -Eeuo pipefail
+# Everyday CLIs, fonts and AUR helpers.
+# (Docker lives in config/docker.sh, Emacs in pkgs/editors.sh — both optional.)
 
 PACMAN_PKGS=(
   "jq"
@@ -16,20 +16,17 @@ PACMAN_PKGS=(
   "zellij"
   "neovim"
   "glow"
+  "gum"
   "harper"
   "figlet"
   "asciinema"
-  "docker"
-  "docker-buildx"
-  "docker-compose"
   "dust"
   "less"
-  "man"
+  "man-db"
   "starship"
   "tldr"
   "tree-sitter-cli"
   "zoxide"
-  "cargo"
   "python-poetry-core"
   "python-terminaltexteffects"
   "bash-completion"
@@ -40,31 +37,7 @@ PACMAN_PKGS=(
   "ttf-jetbrains-mono"
   "ttf-hack-nerd"
   "fastfetch"
-  "emacs"
 )
 
-msg() { printf '\e[1;32m[INFO]\e[0m %s\n' "$*"; }
-warn() { printf '\e[1;33m[WARN]\e[0m %s\n' "$*"; }
-die() {
-  printf '\e[1;31m[ERRO]\e[0m %s\n' "$*"
-  exit 1
-}
-
-need_cmd() { command -v "$1" &>/dev/null; }
-
-ensure_sudo() {
-  if ((EUID != 0)); then
-    sudo -v || die "Permissão de superusuário necessária."
-  fi
-}
-
-main() {
-  ensure_sudo
-  # Sync já feito por repositories.sh (pós-keyring).
-  msg "Instalando pacotes pacman…"
-  sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}"
-
-  msg "Tudo pronto! Pacotes essenciais instalados."
-}
-
-main "$@"
+# Sync already done by repositories.sh (post-keyring).
+pac_install "$(t tools.install)" "${PACMAN_PKGS[@]}"

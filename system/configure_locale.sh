@@ -1,28 +1,30 @@
 #!/bin/bash
+# Generates en_US.UTF-8 plus the locale of the chosen installer language
+# (I18N_LOCALE, from install/i18n/<lang>.sh) and makes the latter the default.
 
 if [[ $EUID -ne 0 ]]; then
-  echo "Por favor, execute como root (sudo)."
-  exit 1
+  echo "✖ $(t user.need_root)"
+  return 1 2>/dev/null || exit 1
 fi
 
-echo "Atualizando pacotes e instalando glibc..."
-pacman -Sy --noconfirm glibc --needed
+_locales=("en_US.UTF-8")
+[[ "$I18N_LOCALE" != "en_US.UTF-8" ]] && _locales+=("$I18N_LOCALE")
 
-echo "Editando /etc/locale.gen para incluir pt_BR.UTF-8 e en_US.UTF-8..."
-sed -i 's/^#\s*\(pt_BR.UTF-8 UTF-8\)/\1/' /etc/locale.gen
-sed -i 's/^#\s*\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+_missing=0
+for _locale in "${_locales[@]}"; do
+  _entry="$_locale UTF-8"
+  sed -i "s/^#\s*\(${_entry}\)/\1/" /etc/locale.gen
+  grep -q "^${_entry}" /etc/locale.gen || echo "$_entry" >>/etc/locale.gen
+  # `locale -a` spells pt_BR.UTF-8 as pt_BR.utf8
+  locale -a 2>/dev/null | grep -qx "${_locale%.UTF-8}.utf8" || _missing=1
+done
 
-grep -q '^pt_BR.UTF-8 UTF-8' /etc/locale.gen || echo 'pt_BR.UTF-8 UTF-8' >>/etc/locale.gen
-grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen || echo 'en_US.UTF-8 UTF-8' >>/etc/locale.gen
+if ((_missing)); then
+  run "$(t locale.gen "${_locales[*]}")" locale-gen
+else
+  ok "$(t locale.present "${_locales[*]}")"
+fi
 
-echo "Gerando os locales suportados..."
-locale-gen
-
-echo "Configurando idioma padrão no /etc/locale.conf..."
-cat <<EOF >/etc/locale.conf
-LANG=pt_BR.UTF-8
-LANGUAGE=pt_BR:en_US
-LC_ALL=
-EOF
-
-echo "Locale configurado!"
+printf 'LANG=%s\nLANGUAGE=%s\n' "$I18N_LOCALE" "$I18N_LANGUAGE" >/etc/locale.conf
+ok "$(t locale.done "$I18N_LOCALE")"
+unset _locales _locale _entry _missing

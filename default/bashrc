@@ -28,8 +28,9 @@ if [[ ! -v BASH_COMPLETION_VERSINFO && -f /usr/share/bash-completion/bash_comple
 fi
 
 ## PATH ##
-# Set complete path
-export PATH="./bin:$HOME/.local/bin:$PATH"
+# User bin dirs first. No relative entries (./bin): any cloned repo could
+# shadow system commands.
+export PATH="$HOME/.local/bin:$PATH"
 set +h
 
 ## Function ##
@@ -76,7 +77,7 @@ alias vi="nvim"
 # Emacs
 alias emacs="emacsclient -c -a 'emacs'"
 alias em="/usr/bin/emacs -nw"
-alias rem="killall emacs || echo 'Emacs server not running' /usr/bin/emacs --daemon"
+alias rem="killall emacs || echo 'Emacs server not running'; /usr/bin/emacs --daemon"
 
 # File Manager #
 # Yazi
@@ -109,7 +110,7 @@ alias parsua='paru -Sua --noconfirm'
 alias parsyu='paru -Syu --noconfirm'
 
 # Yay
-alias yaysyu='yay -S --noconfirm'
+alias yaysyu='yay -Syu --noconfirm'
 
 # Tools #
 # Git
@@ -194,7 +195,7 @@ if command -v fzf &>/dev/null; then
   fi
 fi
 
-# janelas ssh
+# SSH agent bridge to Windows (wsl2-ssh-agent), when installed
 if [[ -x /usr/sbin/wsl2-ssh-agent ]]; then
   eval "$(/usr/sbin/wsl2-ssh-agent)"
 fi

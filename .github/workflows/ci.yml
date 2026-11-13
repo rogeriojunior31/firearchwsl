@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fish
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fish
+      - name: bash -n, shellcheck, fish -n, i18n catalogs, line endings
+        run: bash tests/check.sh
+
+  install:
+    name: Install in a clean Arch container (twice)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the installer unattended and check the result
+        run: bash tests/container.sh --inside
+      - name: Upload the install logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-logs
+          path: /var/log/firearchwsl/

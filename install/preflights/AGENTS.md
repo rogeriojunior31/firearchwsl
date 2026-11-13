@@ -1,46 +1,66 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-04-20 | Updated: 2026-04-20 -->
 
 # preflights
 
 ## Purpose
 
-Steps that prepare the system before any opinionated packages land. Sourced by `install.sh` while running as root, in the order listed in Key Files.
+The installer's runtime (library, translations, UI, error trap, wizard, finale) plus the steps that prepare the base system before opinionated packages land.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `trap-errors.sh` | Defines `catch_errors` and wires it to the `ERR` trap. Prints the failing command and suggests `bash ./install.sh`. Source first — every later script benefits. |
-| `essentials_pkgs.sh` | Minimal `PACMAN_PKGS=()`: `sudo`, `base-devel`, `git`, `fish`, `btop`, `curl`, `wget`, `just`, `make`, `eza`, `bat`, `openssh`, `vim`. Gate further scripts on this succeeding. |
-| `repositories.sh` | Edits `/etc/pacman.conf`: enables `Color`, `ILoveCandy`, `VerbosePkgLists`; adds Omarchy repo (`SigLevel = Optional TrustAll`); overwrites `/etc/pacman.d/mirrorlist` with two global mirrors; on `x86_64` installs Chaotic-AUR (key `3056513887B78AEB`, keyring + mirrorlist pkgs — skippable via `DISABLE_CHAOTIC`). Ends with `pacman -Syu`. |
-| `install-mise.sh` | `pacman -S mise`, then appends the right `mise activate` line to the invoker's shell rc (bash/zsh/fish detected from `$SHELL`; fallback bash). Idempotent via `grep -Fq`. |
+| `lib.sh` | Sourced first by `install.sh`. Sources `i18n.sh` and `ui.sh`; defines `component_enabled`, `resolve_target_user`, `ensure_target_user`, `as_user`. |
+| `i18n.sh` | `i18n_load <lang>` (loads `../i18n/en.sh`, then the language on top), `t <key> [args]`, `i18n_available`, `i18n_name`, `i18n_choose` (numbered picker using plain `read`, because it runs before `gum` exists). Default language: `I18N_DEFAULT_LANG` (`pt_BR`). |
+| `ui.sh` | `ui_init`, `step`, `run`, `pac_install`, status lines (`msg`/`ok`/`skip`/`hint`/`warn`/`die`), `ui_box`, `ui_row`, `ui_banner`, prompts (`ask_input`/`ask_secret`/`ask_confirm`/`ask_choose`/`ask_multi`). Owns the log file (`FIREARCH_LOG`). |
+| `trap-errors.sh` | `ERR` trap: prints step, failing command, last 15 log lines, log path and the re-run command. |
+| `wizard.sh` | The only place that asks questions: user (rejects invalid names and system accounts, UID < 1000), password (mandatory for a new user, typed twice), git identity, hostname, default shell, optional components. Prints the summary; "no" goes back to the form with previous answers pre-filled (password excepted), Ctrl+C cancels. Every answer has a `FIREARCH_*` env override; env-provided answers are fixed and never re-asked. Without a terminal, a new user without `FIREARCH_PASSWORD` is a hard stop. |
+| `finale.sh` | `tte` logo animation (TTY only), summary box, collected warnings, next steps. |
+| `essentials_pkgs.sh` | Minimal `PACMAN_PKGS`: `sudo`, `base-devel`, `diffutils`, `git`, `fish`, `curl`… |
+| `repositories.sh` | `pacman.conf` candy; global mirrorlist (original backed up once to `mirrorlist.firearchwsl.bak`); Chaotic-AUR on x86_64 (key `3056513887B78AEB`, skippable with `DISABLE_CHAOTIC`); then `place_omarchy_last` strips and re-appends `[omarchy]` so the unsigned repo is always last; ends with `pacman -Syu`. A Chaotic-AUR failure is a warning, not fatal. |
+| `install-mise.sh` | `pacman -S mise`. Shell activation lives in `default/bashrc` and `default/config.fish`. |
 
 ## For AI Agents
 
+### How `run` behaves
+
+- TTY: spinner + elapsed time + last log line; command output goes only to the log.
+- `FIREARCH_VERBOSE=1`: raw output on screen and in the log.
+- No TTY: one `✔`/`✖` line per command.
+- The command runs in a subshell with stdin from `/dev/null`. It may be a shell function, but it cannot set variables in the caller and cannot prompt.
+- Returns the command's exit code. Under `set -e` a bare failing `run` triggers the `ERR` trap; `run … || warn …` makes it non-fatal.
+- Never pass secrets as arguments to `run`: the command line is written to the log.
+
+### How `pac_install` behaves
+
+- Checks every name with `LC_ALL=C pacman -Si` first; a miss is double-checked with `pacman -Sp`, which also resolves groups (`base-devel`) and virtual names (`man` → `man-db`).
+- Names that resolve nowhere are dropped and reported once as a warning, so one stale name no longer fails the whole transaction. Prefer the real package name in arrays anyway.
+
+### Prompts
+
+- A variable already set in the environment is never asked for.
+- Prompts read from `/dev/tty` and render on stderr. `UI_INTERACTIVE=1` when stderr is a terminal and `/dev/tty` opens, so piping stdin does not disable them.
+- Without a TTY, `ask_input`/`ask_choose` take the default and `ask_confirm` answers yes.
+- `gum` is used when available on a TTY (`UI_GUM=1`); otherwise plain `read`. `FIREARCH_NO_GUM=1` forces plain prompts.
+- gum exits 1 on Esc and 130 on Ctrl+C (raw mode: Ctrl+C never arrives as SIGINT). `ask_confirm` treats 130 as cancel and 1 as "no".
+- The `ask_*` helpers write the answer with `printf -v "$var"`. Never pass a variable name that matches one of the helper's own locals (`var`, `prompt`, `def`, `val`, `picked`, `item`, `out`, `ans`, `rc`, `opt`): the value would land in the helper's local and be lost.
+
+### Testing the wizard
+
+- Simulate a fresh distro without touching the real one: `unshare -m` + `mount --bind <empty dir> /etc/firearchwsl`, then source only `lib.sh`, `ui_init`, `trap-errors.sh` and `wizard.sh`.
+- Drive it through `script -qec … /dev/null` with keystrokes piped in: lines with sleeps for plain prompts; raw keys (`\r`, `\e[B`, `\x03`) for gum.
+
 ### Working In This Directory
 
-- Scripts assume root (sourced from `install.sh`, which runs as root). They still call `sudo` so they can also be run standalone.
-- Any edit to `/etc/pacman.conf` MUST be guarded with `grep -q` — the file is rewritten in place on every run.
-- Use the `DISABLE_CHAOTIC` env-var pattern for conditional sections; reuse it for similar toggles.
+- Scripts run as root; no `sudo` calls except inside `as_user`.
+- Any edit to `/etc/pacman.conf` must be `grep -q` guarded.
+- `((i++))` returns 1 when `i` is 0 and trips `set -e` — use `i=$((i + 1))`.
 
 ### Testing Requirements
 
-- Rerun on an already-configured distro: `/etc/pacman.conf` should remain unchanged, mise activation line should not duplicate in the rc file.
-
-### Common Patterns
-
-- `set -euo pipefail` + ANSI `msg`/`err` helpers.
-- `command -v sudo >/dev/null 2>&1` guards before calling sudo-dependent commands.
+- Re-run on a configured distro: `/etc/pacman.conf` unchanged, no prompt for the user, no abort.
+- UI under a pseudo-terminal: `script -qec 'bash <demo>' /dev/null`.
 
 ## Dependencies
 
-### Internal
-
-- Sourced by `../../install.sh` in the preparation phase.
-
-### External
-
-- `pacman`, `sudo`, `pacman-key`, `mise`.
-
-<!-- MANUAL: -->
+- `pacman`, `pacman-key`, `gum` (optional), `tte` (optional), `mise`.
