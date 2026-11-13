@@ -127,6 +127,10 @@ else
     exit 1
   fi
   if [[ -d "$dest/.git" ]]; then
+    # The checkout may come from an earlier -Source copy (origin = the
+    # developer's SSH remote) or another -Repo: always fetch from -Repo.
+    git -C "$dest" remote set-url origin "$FA_REPO" 2>/dev/null ||
+      git -C "$dest" remote add origin "$FA_REPO"
     git -C "$dest" fetch --depth 1 origin "$FA_BRANCH"
     git -C "$dest" checkout -q -B "$FA_BRANCH" FETCH_HEAD
   else
