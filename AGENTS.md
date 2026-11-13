@@ -32,6 +32,7 @@ Automated bootstrap for an Arch Linux WSL2 environment. Runs as root on a fresh 
 - **Entry point is always `install.sh`.** Step scripts are sourced, not executed — use `return`, never `exit`, to leave early. User-scoped scripts guard with `: "${TARGET_USER:?…}"`.
 - **Slow or noisy commands go through `run "label" cmd…`** (spinner on a TTY, output to the log file). Never print raw command output to the screen.
 - **Step scripts ask nothing.** All prompts live in `install/preflights/wizard.sh`; every answer has a `FIREARCH_*` env var so the installer can run unattended.
+- **The user always chooses their name and password.** Never create a user without a password; without a terminal, a missing `FIREARCH_PASSWORD` for a new user is a hard stop.
 
 ### Working In This Directory
 

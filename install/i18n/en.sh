@@ -21,6 +21,7 @@ MSG[ui.invalid_choice]="Invalid value for %s: '%s' (options: %s)"
 MSG[ui.multi_hint]="space toggles · enter confirms"
 MSG[ui.install_q]="Install %s?"
 MSG[ui.pkg_count]="%s (%d packages)"
+MSG[ui.pkg_missing]="Not found in any repository, skipped: %s"
 
 ## Banner
 MSG[banner.tagline]="Arch Linux + WSL2, from zero to a full dev environment."
@@ -44,13 +45,15 @@ Options:
 Environment variables (all optional in interactive mode):
   FIREARCH_LANG        installer language: en, pt_BR
   FIREARCH_USER        Linux username to create
-  FIREARCH_PASSWORD    user password (without it, set one later with passwd)
+  FIREARCH_PASSWORD    user password (required for a new user without a terminal)
   FIREARCH_GIT_NAME    git config user.name
   FIREARCH_GIT_EMAIL   git config user.email
+  FIREARCH_HOSTNAME    distro hostname (default: the Windows machine name)
   FIREARCH_SHELL       default shell: bash (default) or fish
   FIREARCH_SKIP        components to skip: langs,lazyvim,doom,docker
   FIREARCH_MISE_TOOLS  mise toolchains (default: \"python node bun rust go\")
   FIREARCH_VERBOSE=1   same as --verbose
+  FIREARCH_NO_GUM=1    plain prompts instead of gum
   FIREARCH_LOG         log file path
   FORCE_CONFIG=1       overwrite ~/.bashrc and config.fish (backs them up first)
   DISABLE_CHAOTIC=1    do not add the Chaotic-AUR repository
@@ -95,11 +98,17 @@ MSG[wiz.user_known]="User registered by a previous run: %s"
 MSG[wiz.user_q]="Your Linux username (lowercase, no spaces)"
 MSG[wiz.user_invalid_env]="FIREARCH_USER missing or invalid ('%s'). E.g.: FIREARCH_USER=jane bash install.sh"
 MSG[wiz.user_invalid]="Invalid name: use lowercase letters, digits, '-' or '_' (and not 'root')."
+MSG[wiz.user_reserved]="'%s' is a system account — pick another name."
+MSG[wiz.user_existing]="already exists"
 MSG[wiz.pw_q]="Password for %s (used by sudo)"
 MSG[wiz.pw_repeat]="Repeat the password"
+MSG[wiz.pw_blank]="The password cannot be empty."
+MSG[wiz.pw_required_env]="A new user needs a password: set FIREARCH_PASSWORD or run in a terminal (user: %s)."
 MSG[wiz.pw_mismatch]="Passwords do not match (or are empty). Try again."
 MSG[wiz.git_name_q]="Your name for Git — user.name (empty = skip)"
 MSG[wiz.git_email_q]="Your email for Git — user.email (empty = skip)"
+MSG[wiz.hostname_q]="Hostname of this WSL distro"
+MSG[wiz.hostname_invalid]="Invalid hostname '%s': letters, digits and '-', up to 63 characters."
 MSG[wiz.shell_q]="Default shell for the user"
 MSG[wiz.comp_q]="Optional components"
 MSG[wiz.comp_langs]="Python · Node · Bun · Rust · Go via mise"
@@ -110,6 +119,7 @@ MSG[wiz.sum_title]="Installation summary"
 MSG[wiz.sum_user]="User"
 MSG[wiz.sum_password]="Password"
 MSG[wiz.sum_git]="Git"
+MSG[wiz.sum_hostname]="Hostname"
 MSG[wiz.sum_shell]="Default shell"
 MSG[wiz.sum_langs]="Languages"
 MSG[wiz.sum_lazyvim]="LazyVim"
@@ -117,8 +127,8 @@ MSG[wiz.sum_doom]="Doom Emacs"
 MSG[wiz.sum_docker]="Docker"
 MSG[wiz.pw_set]="set"
 MSG[wiz.pw_kept]="kept (user already exists)"
-MSG[wiz.pw_unset]="not set — set it later with passwd"
 MSG[wiz.confirm_q]="All good? Start the installation?"
+MSG[wiz.confirm_hint]="No = edit the answers · Ctrl+C = cancel"
 MSG[wiz.aborted]="Installation cancelled — nothing was changed besides the base system update."
 
 ## User
@@ -128,19 +138,24 @@ MSG[user.exists]="User '%s' already exists — moving on."
 MSG[user.add_wheel]="Adding '%s' to the wheel group"
 MSG[user.create]="Creating user '%s' (wheel group)"
 MSG[user.pw_set]="Password set for '%s'."
-MSG[user.no_pw]="User '%s' created WITHOUT a password (sudo will not work). Set one with: wsl -d %s -u root passwd %s"
 MSG[user.sudoers_invalid]="Invalid sudoers drop-in — removed. Aborting."
 MSG[user.sudo_ok]="sudo enabled for the wheel group."
 
 ## Locale
 MSG[locale.gen]="Generating locales (%s)"
+MSG[locale.present]="Locales already generated: %s."
 MSG[locale.done]="Default language: %s (/etc/locale.conf)."
 
 ## WSL
 MSG[wsl.default_user]="WSL default user: %s (/etc/wsl.conf)."
+MSG[wsl.hostname]="Hostname: %s (applied on the next WSL start)."
+MSG[wsl.hostname_kept]="Hostname: %s (follows the Windows machine name)."
 MSG[wsl.systemd]="systemd enabled at WSL boot."
 MSG[wsl.libedit]="libedit.so.2 shim created."
 MSG[wsl.libedit_skip]="libedit.so not present — libedit.so.2 shim not needed right now."
+MSG[wsl.mise_ignore]="mise ignores the Windows-side config (%s)."
+MSG[wsl.mise_ignore_skip]="%s already exists — add %s to its ignored_config_paths yourself if needed."
+MSG[wsl.no_interop]="Windows interop unavailable — mise may also read the Windows-side config."
 
 ## Packages
 MSG[ess.install]="Installing essentials"
@@ -155,8 +170,8 @@ MSG[git.defaults]="Defaults applied: main branch, pull.rebase, aliases co/br/ci/
 
 ## Repositories
 MSG[repo.candy]="pacman: Color + ILoveCandy + VerbosePkgLists."
-MSG[repo.omarchy]="Omarchy repository enabled."
-MSG[repo.mirrors]="Mirrorlist: global mirrors."
+MSG[repo.omarchy]="Omarchy repository enabled (last, so signed repos win)."
+MSG[repo.mirrors]="Mirrorlist: global mirrors (original kept in %s)."
 MSG[repo.chaotic_disabled]="Chaotic-AUR disabled (DISABLE_CHAOTIC)."
 MSG[repo.chaotic_arch]="Chaotic-AUR only exists for x86_64 — skipping."
 MSG[repo.chaotic_already]="Chaotic-AUR repository already enabled."
@@ -167,6 +182,7 @@ MSG[repo.sync]="Syncing repositories (pacman -Syu)"
 
 ## Languages
 MSG[langs.skip]="Languages skipped (FIREARCH_SKIP=langs)."
+MSG[langs.rust_system]="Installing system Rust (cargo)"
 MSG[langs.fail]="Failed to install %s — later: mise use -g %s@latest"
 
 ## Editors
@@ -185,6 +201,7 @@ MSG[ed.doom_fail]="doom install returned an error — later run: ~/.emacs.d/bin/
 MSG[cfg.payloads]="Payloads copied to ~/.local/share/firearchwsl."
 MSG[cfg.rc_installed]="%s installed."
 MSG[cfg.rc_current]="%s is already up to date."
+MSG[cfg.rc_updated]="%s updated to the new default (it had no local edits)."
 MSG[cfg.rc_overwritten]="%s overwritten (backup: %s)."
 MSG[cfg.rc_preserved]="%s has local edits — preserved (FORCE_CONFIG=1 overwrites with a backup)."
 MSG[cfg.starship]="Starship pointed at the firearchwsl theme."

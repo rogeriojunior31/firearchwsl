@@ -12,7 +12,7 @@ Package groups installed after the preflight phase. Groups are kept narrow on pu
 |------|-------------|
 | `good-tools.sh` | Everyday CLIs, fonts and AUR helpers: `jq`, `yq`, `fd`, `ripgrep`, `zellij`, `neovim`, `glow`, `gum`, `starship`, `zoxide`, `python-terminaltexteffects` (`tte`), `yay`, `paru`, nerd fonts, `fastfetch`… |
 | `tuis.sh` | TUIs and the yazi preview stack: `lazygit`, `lazydocker`, `yazi`, `television`, `navi`, `atuin`, `fzf`, `superfile`, `imagemagick`, `poppler`, `chafa`… |
-| `install_langs.sh` | Optional component `langs`. `as_user mise use -g <tool>@latest` for each tool in `FIREARCH_MISE_TOOLS` (default `python node bun rust go`). A failing tool becomes a warning. |
+| `install_langs.sh` | Optional component `langs`. `as_user mise use -g <tool>@latest` for each tool in `FIREARCH_MISE_TOOLS` (default `python node bun rust go`). A failing tool becomes a warning. When mise will not provide Rust (langs skipped, or `rust` not in the list) it installs the pacman `rust` instead, so `cargo` always exists without two toolchains. |
 | `editors.sh` | Optional components `lazyvim` and `doom`. LazyVim starter cloned into `~/.config/nvim` (only if the dir is absent). Doom: installs `emacs`, clones into `~/.emacs.d`, runs `doom --force install`. Failures are warnings. |
 
 ## For AI Agents

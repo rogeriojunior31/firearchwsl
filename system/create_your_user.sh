@@ -19,14 +19,12 @@ if id "$username" &>/dev/null; then
     run "$(t user.add_wheel "$username")" usermod -aG wheel "$username"
   fi
 else
+  # wizard.sh guarantees a password for a new user; never create one without.
+  [[ -n "${FIREARCH_PASSWORD:-}" ]] || die "$(t wiz.pw_required_env "$username")"
   run "$(t user.create "$username")" useradd -m -G wheel -s /bin/bash "$username"
-  if [[ -n "${FIREARCH_PASSWORD:-}" ]]; then
-    # Through stdin: the password never shows up in argv or in the log.
-    printf '%s:%s\n' "$username" "$FIREARCH_PASSWORD" | chpasswd
-    ok "$(t user.pw_set "$username")"
-  else
-    warn "$(t user.no_pw "$username" "${WSL_DISTRO_NAME:-archlinux}" "$username")"
-  fi
+  # Through stdin: the password never shows up in argv or in the log.
+  printf '%s:%s\n' "$username" "$FIREARCH_PASSWORD" | chpasswd
+  ok "$(t user.pw_set "$username")"
 fi
 unset FIREARCH_PASSWORD
 

@@ -20,6 +20,7 @@ MSG[ui.invalid_choice]="Valor inválido para %s: '%s' (opções: %s)"
 MSG[ui.multi_hint]="espaço marca/desmarca · enter confirma"
 MSG[ui.install_q]="Instalar %s?"
 MSG[ui.pkg_count]="%s (%d pacotes)"
+MSG[ui.pkg_missing]="Não encontrado em nenhum repositório, pulado: %s"
 
 ## Banner
 MSG[banner.tagline]="Arch Linux + WSL2, do zero ao ambiente de dev completo."
@@ -43,13 +44,15 @@ Opções:
 Variáveis de ambiente (todas opcionais no modo interativo):
   FIREARCH_LANG        idioma do instalador: en, pt_BR
   FIREARCH_USER        nome do usuário Linux a criar
-  FIREARCH_PASSWORD    senha do usuário (sem ela, defina depois com passwd)
+  FIREARCH_PASSWORD    senha do usuário (obrigatória sem terminal, se o usuário for novo)
   FIREARCH_GIT_NAME    git config user.name
   FIREARCH_GIT_EMAIL   git config user.email
+  FIREARCH_HOSTNAME    hostname da distro (default: nome da máquina Windows)
   FIREARCH_SHELL       shell padrão: bash (default) ou fish
   FIREARCH_SKIP        componentes a pular: langs,lazyvim,doom,docker
   FIREARCH_MISE_TOOLS  toolchains do mise (default: \"python node bun rust go\")
   FIREARCH_VERBOSE=1   igual a --verbose
+  FIREARCH_NO_GUM=1    prompts simples em vez do gum
   FIREARCH_LOG         caminho do arquivo de log
   FORCE_CONFIG=1       sobrescreve ~/.bashrc e config.fish (faz backup antes)
   DISABLE_CHAOTIC=1    não adiciona o repositório Chaotic-AUR
@@ -94,11 +97,17 @@ MSG[wiz.user_known]="Usuário já registrado em execução anterior: %s"
 MSG[wiz.user_q]="Nome do seu usuário Linux (minúsculas, sem espaço)"
 MSG[wiz.user_invalid_env]="FIREARCH_USER ausente ou inválido ('%s'). Ex.: FIREARCH_USER=fulano bash install.sh"
 MSG[wiz.user_invalid]="Nome inválido: use letras minúsculas, números, '-' ou '_' (e não 'root')."
+MSG[wiz.user_reserved]="'%s' é uma conta do sistema — escolha outro nome."
+MSG[wiz.user_existing]="já existe"
 MSG[wiz.pw_q]="Senha para %s (usada no sudo)"
 MSG[wiz.pw_repeat]="Repita a senha"
+MSG[wiz.pw_blank]="A senha não pode ficar vazia."
+MSG[wiz.pw_required_env]="Um usuário novo precisa de senha: defina FIREARCH_PASSWORD ou rode num terminal (usuário: %s)."
 MSG[wiz.pw_mismatch]="As senhas não conferem (ou estão vazias). Tente de novo."
 MSG[wiz.git_name_q]="Seu nome para o Git — user.name (vazio = pular)"
 MSG[wiz.git_email_q]="Seu email para o Git — user.email (vazio = pular)"
+MSG[wiz.hostname_q]="Hostname desta distro WSL"
+MSG[wiz.hostname_invalid]="Hostname inválido '%s': letras, números e '-', até 63 caracteres."
 MSG[wiz.shell_q]="Shell padrão do usuário"
 MSG[wiz.comp_q]="Componentes opcionais"
 MSG[wiz.comp_langs]="Python · Node · Bun · Rust · Go via mise"
@@ -109,6 +118,7 @@ MSG[wiz.sum_title]="Resumo da instalação"
 MSG[wiz.sum_user]="Usuário"
 MSG[wiz.sum_password]="Senha"
 MSG[wiz.sum_git]="Git"
+MSG[wiz.sum_hostname]="Hostname"
 MSG[wiz.sum_shell]="Shell padrão"
 MSG[wiz.sum_langs]="Linguagens"
 MSG[wiz.sum_lazyvim]="LazyVim"
@@ -116,8 +126,8 @@ MSG[wiz.sum_doom]="Doom Emacs"
 MSG[wiz.sum_docker]="Docker"
 MSG[wiz.pw_set]="definida"
 MSG[wiz.pw_kept]="mantida (usuário já existe)"
-MSG[wiz.pw_unset]="não definida — defina depois com passwd"
 MSG[wiz.confirm_q]="Tudo certo? Começar a instalação?"
+MSG[wiz.confirm_hint]="Não = corrigir as respostas · Ctrl+C = cancelar"
 MSG[wiz.aborted]="Instalação cancelada — nada foi alterado além da atualização da base."
 
 ## User
@@ -127,19 +137,24 @@ MSG[user.exists]="Usuário '%s' já existe — seguindo."
 MSG[user.add_wheel]="Adicionando '%s' ao grupo wheel"
 MSG[user.create]="Criando usuário '%s' (grupo wheel)"
 MSG[user.pw_set]="Senha definida para '%s'."
-MSG[user.no_pw]="Usuário '%s' criado SEM senha (sudo não vai funcionar). Defina com: wsl -d %s -u root passwd %s"
 MSG[user.sudoers_invalid]="Drop-in de sudoers inválido — removido. Abortando."
 MSG[user.sudo_ok]="sudo liberado para o grupo wheel."
 
 ## Locale
 MSG[locale.gen]="Gerando locales (%s)"
+MSG[locale.present]="Locales já gerados: %s."
 MSG[locale.done]="Idioma padrão: %s (/etc/locale.conf)."
 
 ## WSL
 MSG[wsl.default_user]="Usuário padrão do WSL: %s (/etc/wsl.conf)."
+MSG[wsl.hostname]="Hostname: %s (aplicado no próximo start do WSL)."
+MSG[wsl.hostname_kept]="Hostname: %s (segue o nome da máquina Windows)."
 MSG[wsl.systemd]="systemd habilitado no boot do WSL."
 MSG[wsl.libedit]="Shim libedit.so.2 criado."
 MSG[wsl.libedit_skip]="libedit.so ausente — shim libedit.so.2 não é necessário agora."
+MSG[wsl.mise_ignore]="mise ignora a config do lado do Windows (%s)."
+MSG[wsl.mise_ignore_skip]="%s já existe — se precisar, adicione %s ao ignored_config_paths dele."
+MSG[wsl.no_interop]="Interop com o Windows indisponível — o mise pode ler também a config do Windows."
 
 ## Packages
 MSG[ess.install]="Instalando essenciais"
@@ -154,8 +169,8 @@ MSG[git.defaults]="Defaults aplicados: branch main, pull.rebase, aliases co/br/c
 
 ## Repositories
 MSG[repo.candy]="pacman: Color + ILoveCandy + VerbosePkgLists."
-MSG[repo.omarchy]="Repositório Omarchy ativo."
-MSG[repo.mirrors]="Mirrorlist: mirrors globais."
+MSG[repo.omarchy]="Repositório Omarchy ativo (por último, para os repositórios assinados terem prioridade)."
+MSG[repo.mirrors]="Mirrorlist: mirrors globais (original guardado em %s)."
 MSG[repo.chaotic_disabled]="Chaotic-AUR desativado (DISABLE_CHAOTIC)."
 MSG[repo.chaotic_arch]="Chaotic-AUR só existe para x86_64 — pulando."
 MSG[repo.chaotic_already]="Repositório Chaotic-AUR já ativo."
@@ -166,6 +181,7 @@ MSG[repo.sync]="Sincronizando repositórios (pacman -Syu)"
 
 ## Languages
 MSG[langs.skip]="Linguagens puladas (FIREARCH_SKIP=langs)."
+MSG[langs.rust_system]="Instalando Rust do sistema (cargo)"
 MSG[langs.fail]="Falha ao instalar %s — depois: mise use -g %s@latest"
 
 ## Editors
@@ -184,6 +200,7 @@ MSG[ed.doom_fail]="doom install retornou erro — depois rode: ~/.emacs.d/bin/do
 MSG[cfg.payloads]="Payloads copiados para ~/.local/share/firearchwsl."
 MSG[cfg.rc_installed]="%s instalado."
 MSG[cfg.rc_current]="%s já está atualizado."
+MSG[cfg.rc_updated]="%s atualizado para o novo padrão (não tinha edições locais)."
 MSG[cfg.rc_overwritten]="%s sobrescrito (backup: %s)."
 MSG[cfg.rc_preserved]="%s tem edições locais — preservado (FORCE_CONFIG=1 sobrescreve com backup)."
 MSG[cfg.starship]="Starship apontando para o tema do firearchwsl."

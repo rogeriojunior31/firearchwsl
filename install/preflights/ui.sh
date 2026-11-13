@@ -19,8 +19,10 @@
 ui_init() {
   UI_TTY=0
   [[ -t 1 ]] && UI_TTY=1
+  # Prompts talk to the terminal directly (/dev/tty), so they work even when
+  # stdin is a pipe. They render on stderr, which must be a terminal too.
   UI_INTERACTIVE=0
-  [[ -t 0 && -t 1 ]] && UI_INTERACTIVE=1
+  if [[ -t 2 ]] && (: </dev/tty) 2>/dev/null; then UI_INTERACTIVE=1; fi
   UI_GUM=0
   FIREARCH_VERBOSE="${FIREARCH_VERBOSE:-0}"
 
@@ -76,9 +78,12 @@ _fmt_dur() {
 }
 
 # Re-detect gum (called once it has been installed).
+# FIREARCH_NO_GUM=1 forces the plain `read` prompts.
 ui_detect_gum() {
   UI_GUM=0
-  if ((UI_INTERACTIVE)) && command -v gum &>/dev/null; then UI_GUM=1; fi
+  if ((UI_INTERACTIVE)) && [[ "${FIREARCH_NO_GUM:-0}" != "1" ]] && command -v gum &>/dev/null; then
+    UI_GUM=1
+  fi
 }
 
 ## ── Status lines ────────────────────────────────────────────────────────────
@@ -185,10 +190,27 @@ run() {
 }
 
 # pac_install "label" pkg…  — pacman -S --needed, package count in the label.
+# A name missing from every repo would make pacman reject the whole
+# transaction, so those are dropped first and reported as a warning.
 pac_install() {
-  local label=$1
+  local label=$1 name
   shift
-  run "$(t ui.pkg_count "$label" "$#")" pacman -S --needed --noconfirm "$@"
+  local -a missing=() keep=() skipped=()
+  # LC_ALL=C: the error text is parsed. `|| true`: pacman exits 1 on any miss.
+  mapfile -t missing < <(LC_ALL=C pacman -Si -- "$@" 2>&1 >/dev/null |
+    sed -n "s/^error: package '\(.*\)' was not found$/\1/p" || true)
+  for name in "$@"; do
+    # -Si misses groups and virtual names (`man` is provided by man-db);
+    # -Sp resolves both, so it gets the final say on each miss.
+    if [[ " ${missing[*]} " == *" $name "* ]] && ! pacman -Sp --print-format '%n' -- "$name" &>/dev/null; then
+      skipped+=("$name")
+    else
+      keep+=("$name")
+    fi
+  done
+  ((${#skipped[@]})) && warn "$(t ui.pkg_missing "${skipped[*]}")"
+  ((${#keep[@]})) || return 0
+  run "$(t ui.pkg_count "$label" "${#keep[@]}")" pacman -S --needed --noconfirm "${keep[@]}"
 }
 
 ## ── Boxes and banner ────────────────────────────────────────────────────────
@@ -236,6 +258,8 @@ ui_banner() {
 ## ── Prompts ─────────────────────────────────────────────────────────────────
 # Shared rule: a variable already set in the environment is never asked for.
 # Without a TTY the default is used.
+# gum exits 1 on Esc and 130 on Ctrl+C (it reads keys in raw mode, so Ctrl+C
+# never reaches the shell as SIGINT). Both cancel the installer.
 
 # ask_input VAR "Question" [default]
 ask_input() {
@@ -243,9 +267,9 @@ ask_input() {
   if [[ -n "${!var:-}" ]]; then return 0; fi
   if ((UI_INTERACTIVE)); then
     if ((UI_GUM)); then
-      val="$(gum input --header "$prompt" --prompt "› " --value "$def")" || die "$(t ui.cancelled)"
+      val="$(gum input --header "$prompt" --prompt "› " --value "$def" </dev/tty)" || die "$(t ui.cancelled)"
     else
-      read -rp "  $prompt${def:+ [$def]}: " val || die "$(t ui.cancelled)"
+      read -rp "  $prompt${def:+ [$def]}: " val </dev/tty || die "$(t ui.cancelled)"
       val="${val:-$def}"
     fi
   else
@@ -258,24 +282,26 @@ ask_input() {
 ask_secret() {
   local var=$1 prompt=$2 val=""
   if ((UI_GUM)); then
-    val="$(gum input --password --header "$prompt" --prompt "› ")" || die "$(t ui.cancelled)"
+    val="$(gum input --password --header "$prompt" --prompt "› " </dev/tty)" || die "$(t ui.cancelled)"
   else
-    read -rsp "  $prompt: " val || die "$(t ui.cancelled)"
-    echo
+    read -rsp "  $prompt: " val </dev/tty || die "$(t ui.cancelled)"
+    echo >&2
   fi
   printf -v "$var" '%s' "$val"
 }
 
-# ask_confirm "Question"  — exit 0 means yes. Without a TTY the answer is yes.
+# ask_confirm "Question"  — exit 0 means yes, 1 means no; Ctrl+C cancels.
+# Without a TTY the answer is yes.
 ask_confirm() {
-  local ans
+  local ans rc=0
   ((UI_INTERACTIVE)) || return 0
   if ((UI_GUM)); then
-    gum confirm --affirmative "$(t ui.yes)" --negative "$(t ui.no)" "$1"
-  else
-    read -rp "  $1 $I18N_YES_NO_HINT: " ans || return 1
-    [[ -z "$ans" || "$ans" =~ $I18N_YES_REGEX ]]
+    gum confirm --affirmative "$(t ui.yes)" --negative "$(t ui.no)" "$1" </dev/tty || rc=$?
+    ((rc == 130)) && die "$(t ui.cancelled)"
+    return "$rc"
   fi
+  read -rp "  $1 $I18N_YES_NO_HINT: " ans </dev/tty || die "$(t ui.cancelled)"
+  [[ -z "$ans" || "$ans" =~ $I18N_YES_REGEX ]]
 }
 
 # ask_choose VAR "Question" default option…
@@ -286,9 +312,9 @@ ask_choose() {
     val="${!var}"
   elif ((UI_INTERACTIVE)); then
     if ((UI_GUM)); then
-      val="$(gum choose --header "$prompt" --selected "$def" "$@")" || die "$(t ui.cancelled)"
+      val="$(gum choose --header "$prompt" --selected "$def" "$@" </dev/tty)" || die "$(t ui.cancelled)"
     else
-      read -rp "  $prompt ($(IFS=/; echo "$*")) [$def]: " val || die "$(t ui.cancelled)"
+      read -rp "  $prompt ($(IFS=/; echo "$*")) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
       val="${val:-$def}"
     fi
   else
@@ -311,7 +337,7 @@ ask_multi() {
   shift 2
   if ((UI_INTERACTIVE && UI_GUM)); then
     out="$(gum choose --no-limit --selected "*" \
-      --header "$prompt ($(t ui.multi_hint))" "$@")" || die "$(t ui.cancelled)"
+      --header "$prompt ($(t ui.multi_hint))" "$@" </dev/tty)" || die "$(t ui.cancelled)"
     while IFS= read -r item; do
       [[ -n "$item" ]] && picked+="${item%% *} "
     done <<<"$out"

@@ -21,6 +21,7 @@ Default shell rc files. `../config/config.sh` copies them into `~/.local/share/f
 - Keep `bashrc` and `config.fish` aliases in parity — users switch shells with `tobash`/`tofish`.
 - Tool init blocks go at the end and must be guarded by `command -v <tool>`: optional components (mise toolchains, Doom, Docker) may not be installed.
 - No absolute paths containing a username — use `$HOME` / `~`.
+- No relative PATH entries (`./bin`, `bin`): any cloned repo could shadow system commands.
 - Comments in English. These files are not translated: they contain no installer output.
 - LF line endings only (`fish -n` and bash both choke on CRLF).
 

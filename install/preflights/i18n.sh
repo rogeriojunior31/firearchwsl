@@ -57,7 +57,7 @@ i18n_choose() {
     printf '  %s%d)%s %s\n' "${C_FIRE:-}" $((i + 1)) "${C_RESET:-}" "$(i18n_name "${langs[i]}")"
   done
   while true; do
-    read -rp "  › [$(i18n_name "$FIREARCH_LANG")]: " choice || return 0
+    read -rp "  › [$(i18n_name "$FIREARCH_LANG")]: " choice </dev/tty || return 0
     [[ -z "$choice" ]] && return 0
     if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#langs[@]})); then
       lang="${langs[choice - 1]}"

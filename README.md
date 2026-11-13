@@ -45,6 +45,7 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
   │  Usuário ......... fulano
   │  Senha ........... definida
   │  Git ............. Fulano <fulano@exemplo.com>
+  │  Hostname ........ meuarch
   │  Shell padrão .... fish
   │  Linguagens ...... sim
   │  LazyVim ......... sim
@@ -110,12 +111,20 @@ bash install.sh
 O instalador pergunta, tudo de uma vez:
 
 1. **Idioma** do instalador.
-2. **Usuário** Linux a criar e a **senha** dele.
-3. **Nome** e **email** do Git (pode deixar vazio para pular).
-4. **Shell padrão**: `bash` ou `fish`.
-5. **Componentes opcionais**: linguagens, LazyVim, Doom Emacs, Docker.
+2. **Usuário** Linux a criar. Contas do sistema (`root`, `bin`, `http`…) e nomes inválidos são recusados na hora.
+3. **Senha** do usuário, digitada duas vezes. Não pode ficar vazia: é a senha do `sudo`.
+4. **Nome** e **email** do Git (pode deixar vazio para pular).
+5. **Hostname** da distro. Enter mantém o nome da máquina Windows.
+6. **Shell padrão**: `bash` ou `fish`.
+7. **Componentes opcionais**: linguagens, LazyVim, Doom Emacs, Docker.
 
-Depois ele mostra o resumo, pede confirmação e segue sozinho. Ao terminar, reinicie a distro no **PowerShell**:
+Depois ele mostra o resumo e pede confirmação:
+
+- **Sim** começa a instalação, que segue sozinha até o fim.
+- **Não** volta ao formulário com as respostas já preenchidas, para você corrigir só o que quiser (a senha é pedida de novo).
+- **Ctrl+C** cancela sem mudar nada além da atualização da base.
+
+Ao terminar, reinicie a distro no **PowerShell**:
 
 ```powershell
 wsl --terminate archlinux
@@ -139,7 +148,9 @@ bash install.sh --yes
 
 Sem terminal (CI, `wsl -- bash install.sh` capturado), o spinner é desligado e cada comando vira uma linha `✔`/`✖`.
 
-Sem `FIREARCH_PASSWORD` nesse modo, o usuário é criado **sem senha** e o instalador avisa como definir depois (`wsl -d archlinux -u root passwd <usuario>`).
+Nesse modo, um usuário novo **exige** `FIREARCH_PASSWORD`: sem ela o instalador para antes de mudar qualquer coisa. Nunca é criado usuário sem senha.
+
+Os prompts leem direto do terminal (`/dev/tty`), então continuam funcionando mesmo se a entrada padrão for um pipe.
 
 ---
 
@@ -155,8 +166,9 @@ Sem `FIREARCH_PASSWORD` nesse modo, o usuário é criado **sem senha** e o insta
 |----------|--------|
 | `FIREARCH_LANG` | Idioma do instalador: `pt_BR`, `en` |
 | `FIREARCH_USER` | Usuário Linux a criar |
-| `FIREARCH_PASSWORD` | Senha do usuário |
+| `FIREARCH_PASSWORD` | Senha do usuário (obrigatória sem terminal, se o usuário for novo) |
 | `FIREARCH_GIT_NAME` / `FIREARCH_GIT_EMAIL` | Identidade do Git |
+| `FIREARCH_HOSTNAME` | Hostname da distro. Default: o nome da máquina Windows |
 | `FIREARCH_SHELL` | Shell padrão: `bash` (default) ou `fish` |
 | `FIREARCH_SKIP` | Componentes a pular: `langs`, `lazyvim`, `doom`, `docker` (separe por vírgula) |
 | `FIREARCH_MISE_TOOLS` | Toolchains do mise. Default: `python node bun rust go` |
@@ -165,6 +177,7 @@ Sem `FIREARCH_PASSWORD` nesse modo, o usuário é criado **sem senha** e o insta
 | `FORCE_CONFIG=1` | Sobrescreve `~/.bashrc` e `config.fish` (com backup `.bak-<data>`) |
 | `DISABLE_CHAOTIC=1` | Não adiciona o Chaotic-AUR |
 | `NO_COLOR=1` | Desliga as cores |
+| `FIREARCH_NO_GUM=1` | Prompts simples (`read`) em vez do `gum` |
 
 ---
 
@@ -175,13 +188,13 @@ O `install.sh` é um orquestrador que dá `source` em cada script. **A ordem imp
 | # | Etapa | Script | O que faz |
 |---|-------|--------|-----------|
 | 1 | Base | `install.sh` | `pacman -Syu`; instala `gum` para os prompts |
-| — | Questionário | `install/preflights/wizard.sh` | Pergunta tudo, mostra o resumo, confirma |
-| 2 | Usuário e sudo | `system/create_your_user.sh` | Cria o usuário no `wheel`, senha, drop-in em `/etc/sudoers.d` |
-| 3 | Locale | `system/configure_locale.sh` | Gera `en_US.UTF-8` e o locale do idioma escolhido |
-| 4 | WSL | `system/wsl_config.sh` | `/etc/wsl.conf`: usuário padrão e systemd; shim do `libedit` |
+| — | Questionário | `install/preflights/wizard.sh` | Pergunta tudo, mostra o resumo, confirma ou volta para corrigir |
+| 2 | Usuário e sudo | `system/create_your_user.sh` | Cria o usuário no `wheel` com a senha escolhida, drop-in em `/etc/sudoers.d` |
+| 3 | Locale | `system/configure_locale.sh` | Gera `en_US.UTF-8` e o locale do idioma escolhido (pula se já existem) |
+| 4 | WSL | `system/wsl_config.sh` | `/etc/wsl.conf`: usuário padrão, hostname, systemd; mise ignora a config do Windows; shim do `libedit` |
 | 5 | Essenciais | `install/preflights/essentials_pkgs.sh` | `base-devel`, `git`, `fish`, `curl`… |
 | 6 | Git | `system/configure_git_user.sh` | `git config --global` |
-| 7 | Repositórios | `install/preflights/repositories.sh` | Omarchy, Chaotic-AUR, mirrors, `pacman -Syu` |
+| 7 | Repositórios | `install/preflights/repositories.sh` | Mirrors (com backup), Chaotic-AUR, Omarchy por último, `pacman -Syu` |
 | 8 | mise | `install/preflights/install-mise.sh` | Instala o `mise` |
 | 9 | CLIs | `install/pkgs/good-tools.sh` | CLIs, fontes, `yay`/`paru` |
 | 10 | TUIs | `install/pkgs/tuis.sh` | TUIs e previews do yazi |
@@ -252,11 +265,24 @@ Cada diretório tem um `AGENTS.md` com contratos, ordem e armadilhas.
 
 **Essenciais** — `sudo` · `base-devel` · `diffutils` · `git` · `fish` · `btop` · `curl` · `wget` · `just` · `make` · `eza` · `bat` · `openssh` · `vim`
 
-**CLIs e fontes** — `jq` · `yq` · `stow` · `fx` · `fd` · `ripgrep` · `7zip` · `zip` · `unzip` · `task` · `zellij` · `neovim` · `glow` · `gum` · `harper` · `figlet` · `asciinema` · `dust` · `less` · `man` · `starship` · `tldr` · `tree-sitter-cli` · `zoxide` · `cargo` · `python-poetry-core` · `python-terminaltexteffects` · `bash-completion` · `yay` · `paru` · `luarocks` · `ttf-cascadia-mono-nerd` · `ttf-jetbrains-mono` · `ttf-hack-nerd` · `fastfetch`
+**CLIs e fontes** — `jq` · `yq` · `stow` · `fx` · `fd` · `ripgrep` · `7zip` · `zip` · `unzip` · `task` · `zellij` · `neovim` · `glow` · `gum` · `harper` · `figlet` · `asciinema` · `dust` · `less` · `man-db` · `starship` · `tldr` · `tree-sitter-cli` · `zoxide` · `python-poetry-core` · `python-terminaltexteffects` · `bash-completion` · `yay` · `paru` · `luarocks` · `ttf-cascadia-mono-nerd` · `ttf-jetbrains-mono` · `ttf-hack-nerd` · `fastfetch`
 
 **TUIs** — `taskwarrior-tui` · `tabiew` · `lazygit` · `television` · `navi` · `yazi` · `imagemagick` · `poppler` · `fzf` · `atuin` · `rsync` · `chafa` · `resvg` · `ffmpegthumbnailer` · `libcaca` · `lynx` · `mediainfo` · `odt2txt` · `perl-image-exiftool` · `python-pillow` · `python-chardet` · `ueberzug` · `w3m` · `lazydocker` · `superfile`
 
 **Opcionais** — mise: `python` `node` `bun` `rust` `go` · `emacs` + Doom · LazyVim · `docker` `docker-buildx` `docker-compose`
+
+O Rust vem do mise. Se você pular as linguagens (ou tirar `rust` de `FIREARCH_MISE_TOOLS`), o instalador põe o `rust` do pacman no lugar, para o `cargo` continuar existindo.
+
+Um pacote que sumiu dos repositórios não derruba mais o grupo inteiro: ele é pulado e vira um aviso no resumo final.
+
+### Repositórios
+
+- **Chaotic-AUR** (assinado) entra antes do **Omarchy**. O Omarchy não tem assinatura (`SigLevel = Optional TrustAll`), então fica por último: o pacman pega cada pacote do primeiro repositório que o tem, e assim o Omarchy só entrega o que nenhum repositório assinado oferece (hoje, o `python-terminaltexteffects`).
+- O `mirrorlist` original fica guardado em `/etc/pacman.d/mirrorlist.firearchwsl.bak`.
+
+### mise e o home do Windows
+
+O WSL abre em `/mnt/c/Users/<você>`, e o mise procura configs subindo a partir da pasta atual: sem ajuste, ele leria o `~/.config/mise` do **Windows** e listaria aquelas ferramentas como `missing`. O instalador cria `~/.config/mise/miserc.toml` ignorando só essa pasta; o `mise.toml` dos seus projetos em `/mnt/c` continua valendo.
 
 ---
 
@@ -268,7 +294,8 @@ O instalador pode ser rodado de novo com segurança:
 - O usuário fica registrado em `/etc/firearchwsl/target_user`: não é perguntado de novo.
 - Edições em `/etc/pacman.conf` e `/etc/wsl.conf` não duplicam.
 - LazyVim e Doom só são instalados se ainda não existem.
-- `~/.bashrc` e `config.fish` com edições suas são **preservados**. `FORCE_CONFIG=1` sobrescreve, guardando um backup.
+- `~/.bashrc` e `config.fish` que você **não editou** são atualizados para a versão nova do repositório. Os que **têm edições suas** são preservados; `FORCE_CONFIG=1` sobrescreve, guardando um backup.
+- `/etc/pacman.conf` é reorganizado para o Omarchy ficar por último, inclusive em instalações antigas.
 - `/etc/docker/daemon.json` existente é preservado.
 
 Não há rollback: se uma etapa falhar, corrija e rode de novo.
@@ -321,8 +348,10 @@ Teste completo: `wsl --unregister archlinux`, `wsl --install archlinux`, clone e
 | Sintoma | Causa provável | Resolução |
 |---------|----------------|-----------|
 | Aviso "Chaotic-AUR falhou" | Rede bloqueia o keyserver ou `cdn-mirror.chaotic.cx` | Rode de novo, ou use `DISABLE_CHAOTIC=1` |
-| `target not found: <pacote>` | O pacote vinha do Chaotic-AUR, que não foi ativado | Resolva o Chaotic-AUR ou remova o pacote do array |
-| `sudo` pede senha que não existe | Rodou sem TTY e sem `FIREARCH_PASSWORD` | `wsl -d archlinux -u root passwd <usuario>` |
+| Aviso "Não encontrado em nenhum repositório" | O pacote vem do Chaotic-AUR, que não foi ativado, ou mudou de nome | Resolva o Chaotic-AUR ou corrija o nome no array |
+| "Um usuário novo precisa de senha" | Rodou sem terminal e sem `FIREARCH_PASSWORD` | Rode num terminal, ou passe `FIREARCH_PASSWORD` |
+| Esqueci a senha do usuário | — | `wsl -d archlinux -u root passwd <usuario>` |
+| Hostname novo não aparece | O WSL só aplica no próximo start | `wsl --terminate archlinux` |
 | WSL ainda abre como root | A distro não foi reiniciada | `wsl --terminate archlinux` no PowerShell |
 | `docker` exige `sudo` | O grupo `docker` só vale após novo login | `wsl --terminate archlinux` |
 | Ícones do prompt aparecem como quadrados | Terminal sem Nerd Font | Configure uma Nerd Font no Windows Terminal |

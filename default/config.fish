@@ -17,7 +17,6 @@ function fish_user_key_bindings
 end
 
 ### PATHS
-set -gx PATH bin $PATH
 set -gx PATH ~/bin $PATH
 set -gx PATH ~/usr/bin $PATH
 set -gx PATH ~/.local/bin $PATH
