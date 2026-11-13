@@ -26,7 +26,7 @@ In **PowerShell** on Windows:
 irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1 | iex
 ```
 
-This installs the official Arch Linux distro (if you do not have it yet), fetches firearchwsl into it and starts the installer. When it finishes, open the new environment with `wsl -d archlinux`.
+This installs the official Arch Linux distro (if you do not have it yet), fetches firearchwsl into it and starts the installer. Then it installs **CaskaydiaMono Nerd Font** for your Windows user and adds a **FireArch** Windows Terminal profile (font + Tokyo Night + 🔥 icon), both without admin rights. The profile is a Windows Terminal fragment, so your `settings.json` is never touched. When it finishes, open the new environment with `wsl -d archlinux` or the FireArch profile.
 
 Options (download the script first, or use the scriptblock form):
 
@@ -41,6 +41,8 @@ Options (download the script first, or use the scriptblock form):
 | `-Source <path>` | Copy a local checkout instead of cloning |
 | `-Yes` | Skip the installer's final confirmation |
 | `-VerboseInstall` | Raw command output instead of spinners |
+| `-NoFont` | Do not install the Nerd Font (or `$env:FIREARCH_NO_FONT = '1'`) |
+| `-NoTerminal` | Do not add the Windows Terminal profile (or `$env:FIREARCH_NO_TERMINAL = '1'`) |
 
 ### Manual install
 
@@ -63,9 +65,11 @@ bash install.sh
 4. **Git name and email** (leave empty to skip).
 5. **Hostname** of the distro. Enter keeps the Windows machine name.
 6. **Default shell**: `bash` or `fish`.
-7. **Optional components**: languages (mise), LazyVim, Doom Emacs, Docker.
+7. **Profile**: `minimal` (CLIs, shells and prompt only), `dev` *(default, everything but Doom Emacs)*, `full` (everything, +5 to 15 min for Doom Emacs) or `custom` (pick TUIs, languages, LazyVim, Doom Emacs and Docker, and each language: Python, Node, Bun, Rust, Go).
 
 Then the summary: **Yes** starts the installation; **No** goes back to the form with your answers pre-filled; **Ctrl+C** cancels.
+
+While it runs, every step header shows the overall progress (bar, percentage, elapsed time), mirrored in the tab title and in the Windows Terminal tab/taskbar progress ring, which turns red if something fails.
 
 ## What you get
 
@@ -85,13 +89,29 @@ Every question has an environment variable; with `--yes` nothing is asked:
 ```bash
 FIREARCH_LANG=en FIREARCH_USER=jane FIREARCH_PASSWORD='s3cret' \
 FIREARCH_GIT_NAME='Jane Doe' FIREARCH_GIT_EMAIL='jane@example.com' \
-FIREARCH_HOSTNAME=devbox FIREARCH_SHELL=fish FIREARCH_SKIP=doom \
+FIREARCH_HOSTNAME=devbox FIREARCH_SHELL=fish FIREARCH_PROFILE=minimal \
 bash install.sh --yes
 ```
 
 A new user always needs a password: without a terminal and without `FIREARCH_PASSWORD`, the installer stops before changing anything. `bash install.sh --help` lists every variable.
 
+`FIREARCH_PROFILE` picks a profile; `FIREARCH_SKIP` (`tuis,langs,lazyvim,doom,docker`) picks components one by one and overrides it. With neither, unattended runs use `dev`.
+
 The same variables work with `bootstrap.ps1`: set them with `$env:FIREARCH_USER = '...'` before running it and they are forwarded into WSL.
+
+## The `firearch` command
+
+After the install, `firearch` is on your PATH. Without arguments it opens a menu.
+
+| Command | What it does |
+|---------|--------------|
+| `firearch update` | `pacman -Syu`, `mise upgrade`, and updates firearchwsl itself (`/opt/firearchwsl`) |
+| `firearch doctor` | Checks WSL, systemd, default user, sudo, Windows interop, DNS, locale, disk space, mise and Docker, each with its fix |
+| `firearch setup` | Runs the installer again (asks the questions again) |
+| `firearch logs` | Opens the latest installer log |
+| `firearch version` | Shows the installed version |
+
+It speaks the language picked at install time (`/etc/firearchwsl/lang`; `FIREARCH_LANG` overrides it).
 
 ## Re-running
 

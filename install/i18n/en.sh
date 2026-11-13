@@ -54,7 +54,9 @@ Environment variables (all optional in interactive mode):
   FIREARCH_GIT_EMAIL   git config user.email
   FIREARCH_HOSTNAME    distro hostname (default: the Windows machine name)
   FIREARCH_SHELL       default shell: bash (default) or fish
-  FIREARCH_SKIP        components to skip: langs,lazyvim,doom,docker
+  FIREARCH_PROFILE     minimal, dev (default), full or custom
+  FIREARCH_SKIP        components to skip: tuis,langs,lazyvim,doom,docker
+                       (overrides the profile)
   FIREARCH_MISE_TOOLS  mise toolchains (default: \"python node bun rust go\")
   FIREARCH_HOME_DIRS   folders created in the home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   same as --verbose
@@ -122,6 +124,15 @@ MSG[wiz.comp_langs]="Python · Node · Bun · Rust · Go via mise"
 MSG[wiz.comp_lazyvim]="Neovim with LazyVim"
 MSG[wiz.comp_doom]="Doom Emacs (takes 5 to 15 min)"
 MSG[wiz.comp_docker]="Docker + buildx + compose"
+MSG[wiz.profile_q]="Installation profile"
+MSG[wiz.profile_minimal]="CLIs, shells and prompt only (fastest)"
+MSG[wiz.profile_dev]="Everything except Doom Emacs (recommended)"
+MSG[wiz.profile_full]="Everything, Doom Emacs included (+5 to 15 min)"
+MSG[wiz.profile_custom]="Pick components and languages one by one"
+MSG[wiz.comp_tuis]="TUIs: lazygit, lazydocker, yazi, atuin, fzf…"
+MSG[wiz.langs_q]="Languages via mise"
+MSG[wiz.sum_profile]="Profile"
+MSG[wiz.sum_tuis]="TUIs"
 MSG[wiz.sum_title]="Installation summary"
 MSG[wiz.sum_user]="User"
 MSG[wiz.sum_password]="Password"
@@ -168,6 +179,7 @@ MSG[wsl.no_interop]="Windows interop unavailable — mise may also read the Wind
 MSG[ess.install]="Installing essentials"
 MSG[tools.install]="Installing CLIs and fonts"
 MSG[tuis.install]="Installing TUIs and yazi previewers"
+MSG[tuis.skip]="TUIs skipped (component disabled)."
 MSG[mise.install]="Installing mise"
 
 ## Git
@@ -212,6 +224,7 @@ MSG[cfg.rc_updated]="%s updated to the new default (it had no local edits)."
 MSG[cfg.rc_overwritten]="%s overwritten (backup: %s)."
 MSG[cfg.rc_preserved]="%s has local edits — preserved (FORCE_CONFIG=1 overwrites with a backup)."
 MSG[cfg.starship]="Starship pointed at the firearchwsl theme."
+MSG[cfg.cli]="Command firearch installed: update, doctor, setup, logs."
 MSG[cfg.home_dirs]="Folders in your home: %s."
 MSG[cfg.home_dir_invalid]="Skipping folder %s — use a name relative to the home."
 MSG[cfg.shell_missing]="Shell %s not found — keeping the current shell."
@@ -240,4 +253,64 @@ MSG[fin.warn_header]="Warnings from this run:"
 MSG[fin.next]="Next steps"
 MSG[fin.step1]="In Windows PowerShell, restart the distro:"
 MSG[fin.step2]="Open it again with %s — you will log in as %s."
-MSG[fin.step3]="Use a Nerd Font in your Windows terminal to see the prompt icons."
+MSG[fin.step3]="Type %s anytime for the menu: update, doctor, setup again."
+MSG[fin.step4]="Use a Nerd Font in your Windows terminal to see the prompt icons."
+
+## firearch command (bin/firearch)
+MSG[cli.usage]="firearch — your firearchwsl companion
+
+Usage:
+  firearch            menu
+  firearch update     system packages, mise tools and firearchwsl itself
+  firearch doctor     check the WSL environment
+  firearch setup      run the installer again (asks the questions again)
+  firearch logs       open the latest installer log
+  firearch version    show the firearchwsl version"
+MSG[cli.menu_q]="What do you want to do?"
+MSG[cli.menu_doctor]="check the environment"
+MSG[cli.menu_update]="update packages, tools and firearchwsl"
+MSG[cli.menu_setup]="run the installer again"
+MSG[cli.menu_logs]="open the latest installer log"
+MSG[cli.menu_quit]="quit"
+MSG[cli.sudo_fail]="sudo is needed for this command."
+MSG[cli.update_title]="Update"
+MSG[cli.update_pkgs]="Updating system packages"
+MSG[cli.update_pkgs_fail]="pacman -Syu failed — see the output of: sudo pacman -Syu"
+MSG[cli.update_mise]="Updating mise tools"
+MSG[cli.update_mise_fail]="mise upgrade failed — run it by hand to see why."
+MSG[cli.update_no_git]="%s is not a git checkout — firearchwsl itself was not updated."
+MSG[cli.update_dirty]="%s has local changes — firearchwsl itself was not updated."
+MSG[cli.update_fetch]="Fetching firearchwsl (%s)"
+MSG[cli.update_fetch_fail]="Could not reach the firearchwsl repository."
+MSG[cli.update_current]="firearchwsl is up to date: %s"
+MSG[cli.update_done]="firearchwsl updated to %s"
+MSG[cli.update_apply]="Run 'firearch setup' to apply the new version."
+MSG[cli.doctor_title]="Doctor"
+MSG[cli.report_ok]="Everything looks good."
+MSG[cli.report_warn]="%d item(s) need attention (see above)."
+MSG[cli.logs_none]="No installer log in /var/log/firearchwsl."
+
+## firearch doctor checks
+MSG[doc.wsl]="Running inside WSL"
+MSG[doc.wsl_fix]="firearchwsl is made for WSL2."
+MSG[doc.systemd]="systemd is running"
+MSG[doc.systemd_fix]="In PowerShell: wsl --terminate %s (systemd=true is in /etc/wsl.conf)."
+MSG[doc.default_user]="%s is the WSL default user"
+MSG[doc.default_user_fix]="Run 'firearch setup' to write it to /etc/wsl.conf."
+MSG[doc.wheel]="%s can use sudo (wheel group)"
+MSG[doc.wheel_fix]="As root: usermod -aG wheel <user>"
+MSG[doc.interop]="Windows interop works (cmd.exe reachable)"
+MSG[doc.interop_fix]="Check [interop] in /etc/wsl.conf and restart the distro."
+MSG[doc.dns]="DNS resolves archlinux.org"
+MSG[doc.dns_fix]="Check /etc/resolv.conf, a VPN or the WSL networking mode."
+MSG[doc.locale]="Locale is valid"
+MSG[doc.locale_fix]="Run 'firearch setup' to generate it again."
+MSG[doc.disk]="More than 5 GB free on /"
+MSG[doc.disk_fix]="Free some space: sudo pacman -Sc, docker system prune."
+MSG[doc.mise]="mise tools are installed"
+MSG[doc.mise_fix]="Run: mise install"
+MSG[doc.docker]="Docker service is active"
+MSG[doc.docker_fix]="Run: sudo systemctl enable --now docker"
+MSG[doc.docker_group]="%s is in the docker group"
+MSG[doc.docker_group_fix]="In PowerShell: wsl --terminate %s (the group applies on the next start)."
+MSG[doc.font_hint]="Prompt icons look like boxes? Use a Nerd Font in the terminal (bootstrap.ps1 installs CaskaydiaMono Nerd Font)."

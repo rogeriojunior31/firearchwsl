@@ -10,11 +10,23 @@
 #   FIREARCH_GIT_EMAIL  git user.email                        (optional)
 #   FIREARCH_HOSTNAME   WSL hostname            (default: current hostname)
 #   FIREARCH_SHELL      bash | fish                           (default: bash)
-#   FIREARCH_SKIP       components to skip: langs,lazyvim,doom,docker
+#   FIREARCH_PROFILE    minimal | dev | full | custom          (default: dev)
+#   FIREARCH_SKIP       components to skip: tuis,langs,lazyvim,doom,docker
+#                       (when set, the profile is not asked)
+#   FIREARCH_MISE_TOOLS languages via mise   (default: python node bun rust go)
 #   FIREARCH_YES=1      skip the final confirmation (= --yes flag)
 
 WIZARD_VARS=(FIREARCH_USER FIREARCH_PASSWORD FIREARCH_GIT_NAME FIREARCH_GIT_EMAIL
-  FIREARCH_HOSTNAME FIREARCH_SHELL FIREARCH_SKIP)
+  FIREARCH_HOSTNAME FIREARCH_SHELL FIREARCH_PROFILE FIREARCH_SKIP FIREARCH_MISE_TOOLS)
+
+# Optional components, in install order, and what each profile skips.
+WIZARD_COMPONENTS=(tuis langs lazyvim doom docker)
+declare -A WIZARD_PROFILE_SKIP=(
+  [minimal]="tuis langs lazyvim doom docker"
+  [dev]="doom"
+  [full]=""
+)
+WIZARD_LANGS=(python node bun rust go)
 
 ## ── Validation ──────────────────────────────────────────────────────────────
 
@@ -131,27 +143,57 @@ wizard_ask_hostname() {
   done
 }
 
+# Profile first; only "custom" opens the component and language lists.
 wizard_ask_components() {
-  [[ -n "${FIREARCH_SKIP+x}" ]] && return 0
+  if [[ -n "${FIREARCH_SKIP+x}" ]]; then
+    FIREARCH_PROFILE="${FIREARCH_PROFILE:-custom}"
+    return 0
+  fi
+  ask_choose FIREARCH_PROFILE "$(t wiz.profile_q)" "$(_prev FIREARCH_PROFILE dev)" \
+    "minimal — $(t wiz.profile_minimal)" \
+    "dev — $(t wiz.profile_dev)" \
+    "full — $(t wiz.profile_full)" \
+    "custom — $(t wiz.profile_custom)"
+  if [[ "$FIREARCH_PROFILE" != custom ]]; then
+    FIREARCH_SKIP="${WIZARD_PROFILE_SKIP[$FIREARCH_PROFILE]}"
+    return 0
+  fi
+  # Unattended "custom" without FIREARCH_SKIP installs everything.
   FIREARCH_SKIP=""
   ((UI_INTERACTIVE)) || return 0
+
   # Not named `picked`: ask_multi has a local of that name, and printf -v
   # would write into it instead of into ours.
   local selection component
   ask_multi selection "$(t wiz.comp_q)" \
+    "tuis — $(t wiz.comp_tuis)" \
     "langs — $(t wiz.comp_langs)" \
     "lazyvim — $(t wiz.comp_lazyvim)" \
     "doom — $(t wiz.comp_doom)" \
     "docker — $(t wiz.comp_docker)"
-  for component in langs lazyvim doom docker; do
+  for component in "${WIZARD_COMPONENTS[@]}"; do
     [[ " $selection " == *" $component "* ]] || FIREARCH_SKIP+="$component "
   done
+
+  # Languages one by one (unless FIREARCH_MISE_TOOLS came from outside).
+  if component_enabled langs && [[ -z "${_wizard_preset[FIREARCH_MISE_TOOLS]:-}" ]]; then
+    ask_multi selection "$(t wiz.langs_q)" \
+      "python — Python" "node — Node.js" "bun — Bun" "rust — Rust (cargo)" "go — Go"
+    if [[ -z "$selection" ]]; then
+      FIREARCH_SKIP+="langs "
+    else
+      FIREARCH_MISE_TOOLS="$selection"
+    fi
+  fi
   FIREARCH_SKIP="${FIREARCH_SKIP% }"
 }
 
+# _on_off component [detail] — "yes (detail)" or "no".
 _on_off() {
   if component_enabled "$1"; then
     printf '%s%s%s' "$C_GREEN" "$(t ui.on)" "$C_RESET"
+    [[ -n "${2:-}" ]] && printf ' %s(%s)%s' "$C_GRAY" "$2" "$C_RESET"
+    return 0
   else
     printf '%s%s%s' "$C_GRAY" "$(t ui.off)" "$C_RESET"
   fi
@@ -183,7 +225,9 @@ wizard_summary() {
     "$(ui_row "$(t wiz.sum_git)" "$(_git_identity)")" \
     "$(ui_row "$(t wiz.sum_hostname)" "$FIREARCH_HOSTNAME")" \
     "$(ui_row "$(t wiz.sum_shell)" "$FIREARCH_SHELL")" \
-    "$(ui_row "$(t wiz.sum_langs)" "$(_on_off langs)")" \
+    "$(ui_row "$(t wiz.sum_profile)" "${C_BOLD}${FIREARCH_PROFILE}${C_RESET}")" \
+    "$(ui_row "$(t wiz.sum_tuis)" "$(_on_off tuis)")" \
+    "$(ui_row "$(t wiz.sum_langs)" "$(_on_off langs "${FIREARCH_MISE_TOOLS:-${WIZARD_LANGS[*]}}")")" \
     "$(ui_row "$(t wiz.sum_lazyvim)" "$(_on_off lazyvim)")" \
     "$(ui_row "$(t wiz.sum_doom)" "$(_on_off doom)")" \
     "$(ui_row "$(t wiz.sum_docker)" "$(_on_off docker)")"
@@ -209,5 +253,6 @@ while true; do
   wizard_reset
   echo
 done
-export FIREARCH_SKIP FIREARCH_HOSTNAME
-_log "[WIZARD] lang=$FIREARCH_LANG user=$FIREARCH_USER host=$FIREARCH_HOSTNAME shell=$FIREARCH_SHELL skip='${FIREARCH_SKIP}'"
+FIREARCH_MISE_TOOLS="${FIREARCH_MISE_TOOLS:-${WIZARD_LANGS[*]}}"
+export FIREARCH_SKIP FIREARCH_HOSTNAME FIREARCH_PROFILE FIREARCH_MISE_TOOLS
+_log "[WIZARD] lang=$FIREARCH_LANG user=$FIREARCH_USER host=$FIREARCH_HOSTNAME shell=$FIREARCH_SHELL profile=$FIREARCH_PROFILE skip='${FIREARCH_SKIP}' langs='${FIREARCH_MISE_TOOLS}'"

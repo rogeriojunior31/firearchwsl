@@ -78,6 +78,14 @@ for _dir in ${FIREARCH_HOME_DIRS-Projects Work Notes}; do
 done
 ((${#_dirs[@]})) && ok "$(t cfg.home_dirs "${_dirs[*]}")"
 
+# The `firearch` command (update, doctor, setup, logs) speaks the language
+# picked here.
+chmod 0755 "$FIREARCH_ROOT/bin/firearch"
+ln -sf "$FIREARCH_ROOT/bin/firearch" /usr/local/bin/firearch
+mkdir -p /etc/firearchwsl
+printf '%s\n' "$FIREARCH_LANG" >/etc/firearchwsl/lang
+ok "$(t cfg.cli)"
+
 # Everything written here belongs to the target user
 chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config" "$TARGET_HOME/.local"
 chown -h "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/starship.toml"

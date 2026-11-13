@@ -26,7 +26,8 @@ printf '\n  %s%s%s\n' "$C_BOLD" "$(t fin.next)" "$C_RESET"
 printf '  1. %s\n' "$(t fin.step1)"
 printf '     %swsl --terminate %s%s\n' "$C_FIRE" "$_distro" "$C_RESET"
 printf '  2. %s\n' "$(t fin.step2 "${C_FIRE}wsl -d ${_distro}${C_RESET}" "${C_BOLD}${TARGET_USER}${C_RESET}")"
-printf '  3. %s\n\n' "$(t fin.step3)"
+printf '  3. %s\n' "$(t fin.step3 "${C_FIRE}firearch${C_RESET}")"
+printf '  4. %s\n\n' "$(t fin.step4)"
 
 _log "[DONE] finished in $_total with ${#UI_WARNINGS[@]} warning(s)"
 unset _distro _total _warning

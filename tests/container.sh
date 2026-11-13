@@ -11,7 +11,9 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${1:-}" != "--inside" ]]; then
-  exec docker run --rm -t -v "$ROOT:/src:ro" archlinux:latest \
+  # No -t: with a terminal the installer would turn interactive and wait for
+  # the questions the env vars below leave open (e.g. the hostname).
+  exec docker run --rm -v "$ROOT:/src:ro" archlinux:latest \
     bash -c 'cp -r /src /firearchwsl && bash /firearchwsl/tests/container.sh --inside'
 fi
 
@@ -56,6 +58,10 @@ check "home folders created, owned by user" bash -c 'for d in Projects Work Note
 check "LazyVim cloned"                     test -f /home/ci/.config/nvim/init.lua
 check "mise tools installed"               sudo -Hu ci bash -lc 'cd ~ && mise ls --current | grep -q node'
 check "fish config loads"                  sudo -Hu ci fish -c 'type -q starship'
+check "TUIs installed"                     command -v lazygit
+check "firearch command on PATH"           sudo -Hu ci bash -lc 'firearch version | grep -q firearchwsl'
+check "firearch speaks the install lang"   bash -c '[[ "$(cat /etc/firearchwsl/lang)" == en ]] && sudo -Hu ci firearch --help | grep -q companion'
+check "firearch doctor runs"               bash -c 'sudo -Hu ci firearch doctor | grep -q "DNS resolves"'
 check "second run had no failures"         bash -c '! grep -q "^\[FAIL\]" /var/log/firearchwsl/ci-run2.log'
 check "second run had no warnings"         bash -c '! grep -q "^\[WARN\]" /var/log/firearchwsl/ci-run2.log'
 

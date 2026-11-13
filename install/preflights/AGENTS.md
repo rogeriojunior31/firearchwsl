@@ -14,7 +14,7 @@ The installer's runtime (library, translations, UI, error trap, wizard, finale) 
 | `i18n.sh` | `i18n_load <lang>` (loads `../i18n/en.sh`, then the language on top), `t <key> [args]`, `i18n_available`, `i18n_name`, `i18n_choose` (numbered picker using plain `read`, because it runs before `gum` exists). Default language: `I18N_DEFAULT_LANG` (`pt_BR`). |
 | `ui.sh` | `ui_init`, `step`, `run`, `pac_install`, status lines (`msg`/`ok`/`skip`/`hint`/`warn`/`die`), `ui_box`, `ui_row`, `ui_banner`, prompts (`ask_input`/`ask_secret`/`ask_confirm`/`ask_choose`/`ask_multi`). Owns the log file (`FIREARCH_LOG`). |
 | `trap-errors.sh` | `ERR` trap: prints step, failing command, last 15 log lines, log path and the re-run command. |
-| `wizard.sh` | The only place that asks questions: user (rejects invalid names and system accounts, UID < 1000), password (mandatory for a new user, typed twice), git identity, hostname, default shell, optional components. Prints the summary; "no" goes back to the form with previous answers pre-filled (password excepted), Ctrl+C cancels. Every answer has a `FIREARCH_*` env override; env-provided answers are fixed and never re-asked. Without a terminal, a new user without `FIREARCH_PASSWORD` is a hard stop. |
+| `wizard.sh` | The only place that asks questions: user (rejects invalid names and system accounts, UID < 1000), password (mandatory for a new user, typed twice), git identity, hostname, default shell, install profile (`minimal`/`dev`/`full`/`custom`; `custom` opens the component list and then the language list). Prints the summary; "no" goes back to the form with previous answers pre-filled (password excepted), Ctrl+C cancels. Every answer has a `FIREARCH_*` env override; env-provided answers are fixed and never re-asked. Without a terminal, a new user without `FIREARCH_PASSWORD` is a hard stop. |
 | `finale.sh` | `tte` logo animation (TTY only), summary box, collected warnings, next steps. |
 | `essentials_pkgs.sh` | Minimal `PACMAN_PKGS`: `sudo`, `base-devel`, `diffutils`, `git`, `fish`, `curl`… |
 | `repositories.sh` | `pacman.conf` candy; global mirrorlist (original backed up once to `mirrorlist.firearchwsl.bak`); Chaotic-AUR on x86_64 (key `3056513887B78AEB`, skippable with `DISABLE_CHAOTIC`); then `place_omarchy_last` strips and re-appends `[omarchy]` so the unsigned repo is always last; ends with `pacman -Syu`. A Chaotic-AUR failure is a warning, not fatal. |
@@ -43,7 +43,7 @@ The installer's runtime (library, translations, UI, error trap, wizard, finale) 
 - Without a TTY, `ask_input`/`ask_choose` take the default and `ask_confirm` answers yes.
 - `gum` is used when available on a TTY (`UI_GUM=1`); otherwise plain `read`. `FIREARCH_NO_GUM=1` forces plain prompts.
 - gum exits 1 on Esc and 130 on Ctrl+C (raw mode: Ctrl+C never arrives as SIGINT). `ask_confirm` treats 130 as cancel and 1 as "no".
-- The `ask_*` helpers write the answer with `printf -v "$var"`. Never pass a variable name that matches one of the helper's own locals (`var`, `prompt`, `def`, `val`, `picked`, `item`, `out`, `ans`, `rc`, `opt`): the value would land in the helper's local and be lost.
+- The `ask_*` helpers write the answer with `printf -v "$var"`. Never pass a variable name that matches one of the helper's own locals (`var`, `prompt`, `def`, `val`, `picked`, `item`, `out`, `ans`, `rc`, `opt`, `sel`, `keys`, `selected`): the value would land in the helper's local and be lost.
 
 ### Testing the wizard
 

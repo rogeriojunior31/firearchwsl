@@ -29,4 +29,9 @@ PACMAN_PKGS=(
   "superfile"
 )
 
+if ! component_enabled tuis; then
+  skip "$(t tuis.skip)"
+  return 0
+fi
+
 pac_install "$(t tuis.install)" "${PACMAN_PKGS[@]}"

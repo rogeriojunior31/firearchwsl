@@ -62,11 +62,27 @@ ui_init() {
   UI_FAIL_CMD=""
   UI_T0=$SECONDS
 
-  trap '_ui_restore_cursor' EXIT
+  trap '_ui_on_exit $?' EXIT
   trap '_ui_restore_cursor; printf "\n%s  ✖ %s%s\n" "$C_RED" "$(t ui.interrupted)" "$C_RESET"; exit 130' INT
 }
 
 _ui_restore_cursor() { ((${UI_TTY:-0})) && printf '\e[?25h' || true; }
+
+# Progress in the terminal itself: tab title (OSC 0) and the Windows Terminal
+# tab/taskbar progress ring (OSC 9;4 — state 1 normal, 2 error, 0 clear).
+# Other terminals ignore both sequences.
+_ui_osc() {
+  ((${UI_TTY:-0})) || return 0
+  printf '\e]9;4;%d;%d\a' "$1" "$2"
+  [[ -n "${3:-}" ]] && printf '\e]0;%s\a' "$3"
+  return 0
+}
+
+# Success clears the progress ring; a failure leaves it red.
+_ui_on_exit() {
+  _ui_restore_cursor
+  if (($1 == 0)); then _ui_osc 0 0; else _ui_osc 2 100; fi
+}
 
 # Append one plain (uncolored) line to the log.
 _log() { printf '%s\n' "$*" >>"${FIREARCH_LOG:-/dev/null}"; }
@@ -104,22 +120,44 @@ die() {
   exit 1
 }
 
-# Step header:  ━━ [03/14] Locale ━━━━━━━━━━━━━
+# _ui_meter <percent> <cells> → "▰▰▰▱▱▱▱▱▱▱"
+_ui_meter() {
+  local done=$(($1 * $2 / 100)) out="" i
+  for ((i = 0; i < $2; i++)); do
+    if ((i < done)); then out+="▰"; else out+="▱"; fi
+  done
+  printf '%s' "$out"
+}
+
+# Step header with the overall progress:
+#   ━━ [03/14] Locale ━━━━━━━━━━━━━━━━━━━ ▰▰▱▱▱▱▱▱▱▱ 14% · 1m02s
 step() {
   UI_STEP_N=$((UI_STEP_N + 1))
   UI_STEP_TITLE="$1"
-  local tag
+  local tag right="" pct=0
   if ((UI_STEP_TOTAL > 0)); then
     tag="$(printf '[%02d/%02d]' "$UI_STEP_N" "$UI_STEP_TOTAL")"
+    # Steps already finished, so the last step starts below 100%.
+    pct=$(((UI_STEP_N - 1) * 100 / UI_STEP_TOTAL))
+    right="$(printf '%3d%% · %s' "$pct" "$(_fmt_dur $((SECONDS - UI_T0)))")"
   else
     tag="$(printf '[%02d]' "$UI_STEP_N")"
   fi
-  local width=$((UI_COLS < 72 ? UI_COLS : 72))
-  local fill=$((width - ${#tag} - ${#1} - 6))
+  local width=$((UI_COLS < 80 ? UI_COLS : 80)) meter="" meter_len=0
+  # The meter only when it fits; ${#} would count bytes in the C locale.
+  if [[ -n "$right" ]] && ((width - ${#tag} - ${#1} - ${#right} >= 26)); then
+    meter="$(_ui_meter "$pct" 10)"
+    meter_len=11
+  fi
+  local fill=$((width - ${#tag} - ${#1} - 6 - meter_len - ${#right} - (${#right} ? 1 : 0)))
   ((fill < 3)) && fill=3
   local bar
   bar="$(printf '━%.0s' $(seq 1 "$fill"))"
-  printf '\n%s━━ %s%s %s%s %s%s%s\n' "$C_FIRE" "$C_BOLD" "$tag" "$1" "$C_RESET" "$C_FIRE" "$bar" "$C_RESET"
+  printf '\n%s━━ %s%s %s%s %s%s%s' "$C_FIRE" "$C_BOLD" "$tag" "$1" "$C_RESET" "$C_FIRE" "$bar" "$C_RESET"
+  [[ -n "$meter" ]] && printf ' %s%s%s' "$C_FIRE" "$meter" "$C_RESET"
+  [[ -n "$right" ]] && printf ' %s%s%s' "$C_GRAY" "$right" "$C_RESET"
+  printf '\n'
+  _ui_osc 1 "$pct" "firearchwsl $tag $1"
   _log ""
   _log "════ $tag $1 ════"
 }
@@ -305,28 +343,50 @@ ask_confirm() {
 }
 
 # ask_choose VAR "Question" default option…
+# An option may be "key — description": the menu shows the whole line and VAR
+# receives the key (first word). default is a key.
 ask_choose() {
-  local var=$1 prompt=$2 def=$3 val opt
+  local var=$1 prompt=$2 def=$3 val opt sel="" keys=""
   shift 3
-  if [[ -n "${!var:-}" ]]; then
-    val="${!var}"
-  elif ((UI_INTERACTIVE)); then
-    if ((UI_GUM)); then
-      val="$(gum choose --header "$prompt" --selected "$def" "$@" </dev/tty)" || die "$(t ui.cancelled)"
-    else
-      read -rp "  $prompt ($(IFS=/; echo "$*")) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
-      val="${val:-$def}"
-    fi
-  else
-    val="$def"
-  fi
   for opt in "$@"; do
-    if [[ "$opt" == "$val" ]]; then
-      printf -v "$var" '%s' "$val"
-      return 0
-    fi
+    keys+="${keys:+/}${opt%% *}"
+    [[ "${opt%% *}" == "$def" ]] && sel=$opt
   done
-  die "$(t ui.invalid_choice "$var" "$val" "$*")"
+  while true; do
+    if [[ -n "${!var:-}" ]]; then
+      val="${!var}"
+    elif ((UI_INTERACTIVE)); then
+      if ((UI_GUM)); then
+        local -a selected=()
+        [[ -n "$sel" ]] && selected=(--selected "$sel")
+        val="$(gum choose --header "$prompt" "${selected[@]}" "$@" </dev/tty)" || die "$(t ui.cancelled)"
+      else
+        if [[ "$*" == *" — "* ]]; then
+          printf '  %s\n' "$prompt" >&2
+          for opt in "$@"; do printf '    %s%s%s%s\n' "$C_BOLD" "${opt%% *}" "$C_RESET" "${opt#"${opt%% *}"}" >&2; done
+          read -rp "  ($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
+        else
+          read -rp "  $prompt ($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
+        fi
+        val="${val:-$def}"
+      fi
+    else
+      val="$def"
+    fi
+    val="${val%% *}"
+    for opt in "$@"; do
+      if [[ "${opt%% *}" == "$val" ]]; then
+        printf -v "$var" '%s' "$val"
+        return 0
+      fi
+    done
+    # A typo in the terminal is asked again; a bad env value is fatal.
+    if ((UI_INTERACTIVE)) && [[ -z "${!var:-}" ]]; then
+      hint "$(t ui.invalid_choice "$var" "$val" "${keys//\// }")"
+      continue
+    fi
+    die "$(t ui.invalid_choice "$var" "$val" "${keys//\// }")"
+  done
 }
 
 # ask_multi VAR "Question" "key — description"…

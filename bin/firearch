@@ -1,0 +1,205 @@
+#!/bin/bash
+# firearch — day-to-day companion of a firearchwsl install.
+# Installed as /usr/local/bin/firearch (a symlink) by config/config.sh.
+#
+#   firearch            menu
+#   firearch update     system packages, mise tools and firearchwsl itself
+#   firearch doctor     health check of the WSL environment
+#   firearch setup      run the installer again (asks the questions again)
+#   firearch logs       open the latest installer log
+#   firearch version    firearchwsl version
+set -Eeuo pipefail
+
+FIREARCH_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export FIREARCH_ROOT
+# shellcheck source=install/preflights/lib.sh
+source "$FIREARCH_ROOT/install/preflights/lib.sh"
+
+# Language: FIREARCH_LANG, else the one picked at install time, else $LANG.
+_lang="${FIREARCH_LANG:-}"
+if [[ -z "$_lang" && -r /etc/firearchwsl/lang ]]; then
+  _lang="$(tr -d '[:space:]' </etc/firearchwsl/lang)"
+fi
+if [[ -z "$_lang" ]]; then
+  case "${LANG:-}" in pt*) _lang=pt_BR ;; *) _lang=en ;; esac
+fi
+i18n_load "$_lang" 2>/dev/null || i18n_load en
+unset _lang
+
+# Nothing to keep: the commands below report on screen.
+FIREARCH_LOG="${FIREARCH_LOG:-/dev/null}"
+ui_init
+ui_detect_gum
+
+## ── Helpers ─────────────────────────────────────────────────────────────────
+
+_sudo() { if ((EUID == 0)); then "$@"; else sudo "$@"; fi; }
+
+# `run` gives the command no stdin, so sudo could not ask for the password
+# there: ask once, up front.
+_sudo_ready() {
+  ((EUID == 0)) && return 0
+  sudo -v || die "$(t cli.sudo_fail)"
+}
+
+# The checkout belongs to root (/opt/firearchwsl) or to the user (/mnt/c):
+# trust it explicitly, whoever runs git.
+_git() { _sudo git -c safe.directory="$FIREARCH_ROOT" -C "$FIREARCH_ROOT" "$@"; }
+_is_git() { [[ -d "$FIREARCH_ROOT/.git" ]]; }
+
+_version() {
+  if _is_git; then
+    git -c safe.directory="$FIREARCH_ROOT" -C "$FIREARCH_ROOT" log -1 --format='%h (%cs)' 2>/dev/null || echo "?"
+  else
+    echo "?"
+  fi
+}
+
+## ── update ──────────────────────────────────────────────────────────────────
+
+cmd_update() {
+  step "$(t cli.update_title)"
+  _sudo_ready
+  run "$(t cli.update_pkgs)" _sudo pacman -Syu --noconfirm || warn "$(t cli.update_pkgs_fail)"
+
+  if ((EUID != 0)) && command -v mise &>/dev/null; then
+    run "$(t cli.update_mise)" mise upgrade || warn "$(t cli.update_mise_fail)"
+  fi
+
+  if ! _is_git; then
+    skip "$(t cli.update_no_git "$FIREARCH_ROOT")"
+  elif [[ -n "$(_git status --porcelain 2>/dev/null)" ]]; then
+    warn "$(t cli.update_dirty "$FIREARCH_ROOT")"
+  else
+    local branch before after
+    branch="$(_git rev-parse --abbrev-ref HEAD)"
+    before="$(_git rev-parse HEAD)"
+    run "$(t cli.update_fetch "$branch")" _git fetch --depth 1 origin "$branch" ||
+      { warn "$(t cli.update_fetch_fail)"; return 0; }
+    after="$(_git rev-parse FETCH_HEAD)"
+    if [[ "$before" == "$after" ]]; then
+      ok "$(t cli.update_current "$(_version)")"
+    else
+      _git checkout -q -B "$branch" FETCH_HEAD
+      ok "$(t cli.update_done "$(_version)")"
+      hint "$(t cli.update_apply)"
+    fi
+  fi
+  _cli_report
+}
+
+## ── doctor ──────────────────────────────────────────────────────────────────
+
+# check "label" "how to fix" cmd…  — ✔ when cmd succeeds, ⚠ + fix otherwise.
+check() {
+  local label=$1 fix=$2
+  shift 2
+  if "$@" &>/dev/null; then
+    ok "$label"
+  else
+    warn "$label"
+    hint "    → $fix"
+  fi
+}
+
+_in_wsl() { [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version; }
+_systemd_pid1() { [[ "$(cat /proc/1/comm 2>/dev/null)" == systemd ]]; }
+_default_user() { grep -qx "default=$(id -un)" /etc/wsl.conf; }
+_in_group() { id -nG | tr ' ' '\n' | grep -qx "$1"; }
+_interop() { [[ -x /mnt/c/Windows/System32/cmd.exe ]]; }
+_dns() { getent hosts archlinux.org; }
+_locale_ok() { ! locale 2>&1 | grep -q 'Cannot set'; }
+_disk_ok() { (($(df -Pk / | awk 'NR == 2 { print $4 }') > 5 * 1024 * 1024)); }
+_mise_ok() { [[ -z "$(cd ~ && mise ls --current --missing 2>/dev/null)" ]]; }
+_docker_ok() { systemctl is-active --quiet docker; }
+
+cmd_doctor() {
+  step "$(t cli.doctor_title)"
+  local me
+  me="$(id -un)"
+  local distro="${WSL_DISTRO_NAME:-archlinux}"
+  check "$(t doc.wsl)" "$(t doc.wsl_fix)" _in_wsl
+  check "$(t doc.systemd)" "$(t doc.systemd_fix "$distro")" _systemd_pid1
+  if ((EUID != 0)); then
+    check "$(t doc.default_user "$me")" "$(t doc.default_user_fix)" _default_user
+    check "$(t doc.wheel "$me")" "$(t doc.wheel_fix)" _in_group wheel
+  fi
+  check "$(t doc.interop)" "$(t doc.interop_fix)" _interop
+  check "$(t doc.dns)" "$(t doc.dns_fix)" _dns
+  check "$(t doc.locale)" "$(t doc.locale_fix)" _locale_ok
+  check "$(t doc.disk)" "$(t doc.disk_fix)" _disk_ok
+  if command -v mise &>/dev/null && ((EUID != 0)); then
+    check "$(t doc.mise)" "$(t doc.mise_fix)" _mise_ok
+  fi
+  if command -v docker &>/dev/null; then
+    check "$(t doc.docker)" "$(t doc.docker_fix)" _docker_ok
+    ((EUID == 0)) || check "$(t doc.docker_group "$me")" "$(t doc.docker_group_fix "$distro")" _in_group docker
+  fi
+  command -v starship &>/dev/null && hint "$(t doc.font_hint)"
+  _cli_report
+}
+
+# Final line: all good, or how many things need attention.
+_cli_report() {
+  echo
+  if ((${#UI_WARNINGS[@]})); then
+    printf '  %s%s%s\n\n' "$C_YELLOW" "$(t cli.report_warn "${#UI_WARNINGS[@]}")" "$C_RESET"
+    return 1
+  fi
+  printf '  %s%s%s\n\n' "$C_GREEN" "$(t cli.report_ok)" "$C_RESET"
+}
+
+## ── setup / logs / version ──────────────────────────────────────────────────
+
+cmd_setup() {
+  _sudo_ready
+  _sudo bash "$FIREARCH_ROOT/install.sh" "$@"
+}
+
+cmd_logs() {
+  local latest
+  latest="$(ls -t /var/log/firearchwsl/*.log 2>/dev/null | head -1 || true)"
+  [[ -n "$latest" ]] || die "$(t cli.logs_none)"
+  if ((UI_TTY)) && command -v less &>/dev/null; then
+    less -R +G "$latest"
+  else
+    cat "$latest"
+  fi
+}
+
+cmd_version() { printf 'firearchwsl %s — %s\n' "$(_version)" "$FIREARCH_ROOT"; }
+
+## ── menu ────────────────────────────────────────────────────────────────────
+
+cmd_menu() {
+  ((UI_INTERACTIVE)) || { t cli.usage; echo; return 0; }
+  printf '\n  %s%s🔥 firearch%s %s%s%s\n\n' "$C_BOLD" "$C_FIRE" "$C_RESET" "$C_GRAY" "$(_version)" "$C_RESET"
+  local choice
+  ask_choose choice "$(t cli.menu_q)" doctor \
+    "doctor — $(t cli.menu_doctor)" \
+    "update — $(t cli.menu_update)" \
+    "setup — $(t cli.menu_setup)" \
+    "logs — $(t cli.menu_logs)" \
+    "quit — $(t cli.menu_quit)"
+  [[ "$choice" == quit ]] && return 0
+  "cmd_$choice"
+}
+
+case "${1:-}" in
+  "") cmd_menu ;;
+  update | doctor | logs | version) "cmd_$1" ;;
+  setup)
+    shift
+    cmd_setup "$@"
+    ;;
+  -h | --help | help)
+    t cli.usage
+    echo
+    ;;
+  *)
+    echo "✖ $(t pre.unknown_opt "$1")" >&2
+    t cli.usage >&2
+    echo >&2
+    exit 2
+    ;;
+esac
