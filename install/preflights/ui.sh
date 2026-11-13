@@ -17,6 +17,12 @@
 #   NO_COLOR=1           disable colors
 
 ui_init() {
+  # Widths are measured in characters (${#s}), which needs a UTF-8 locale;
+  # a fresh Arch image runs in C. C.UTF-8 ships with glibc.
+  if [[ "$(locale charmap 2>/dev/null)" != UTF-8 ]] && locale -a 2>/dev/null | grep -qix 'c.utf-\?8'; then
+    export LC_CTYPE=C.UTF-8
+  fi
+  UI_PAD="  "
   UI_TTY=0
   [[ -t 1 ]] && UI_TTY=1
   # Prompts talk to the terminal directly (/dev/tty), so they work even when
@@ -63,7 +69,7 @@ ui_init() {
   UI_T0=$SECONDS
 
   trap '_ui_on_exit $?' EXIT
-  trap '_ui_restore_cursor; printf "\n%s  ✖ %s%s\n" "$C_RED" "$(t ui.interrupted)" "$C_RESET"; exit 130' INT
+  trap 'tui_stop; _ui_restore_cursor; printf "\n%s  ✖ %s%s\n" "$C_RED" "$(t ui.interrupted)" "$C_RESET"; exit 130' INT
 }
 
 _ui_restore_cursor() { ((${UI_TTY:-0})) && printf '\e[?25h' || true; }
@@ -73,13 +79,16 @@ _ui_restore_cursor() { ((${UI_TTY:-0})) && printf '\e[?25h' || true; }
 # Other terminals ignore both sequences.
 _ui_osc() {
   ((${UI_TTY:-0})) || return 0
-  printf '\e]9;4;%d;%d\a' "$1" "$2"
-  [[ -n "${3:-}" ]] && printf '\e]0;%s\a' "$3"
-  return 0
+  local seq
+  printf -v seq '\e]9;4;%d;%d\a' "$1" "$2"
+  [[ -n "${3:-}" ]] && seq+=$'\e]0;'"$3"$'\a'
+  # While the full-screen view is on, stdout is the log: use the terminal.
+  if ((${UI_TUI:-0})); then printf '%s' "$seq" >&3; else printf '%s' "$seq"; fi
 }
 
 # Success clears the progress ring; a failure leaves it red.
 _ui_on_exit() {
+  tui_stop
   _ui_restore_cursor
   if (($1 == 0)); then _ui_osc 0 0; else _ui_osc 2 100; fi
 }
@@ -104,18 +113,36 @@ ui_detect_gum() {
 
 ## ── Status lines ────────────────────────────────────────────────────────────
 
-msg()  { printf '  %s•%s %s\n' "$C_BLUE" "$C_RESET" "$*"; _log "[INFO] $*"; }
-ok()   { printf '  %s✔%s %s\n' "$C_GREEN" "$C_RESET" "$*"; _log "[ OK ] $*"; }
-skip() { printf '  %s↷ %s%s\n' "$C_GRAY" "$*" "$C_RESET"; _log "[SKIP] $*"; }
-hint() { printf '  %s%s%s\n' "$C_GRAY" "$*" "$C_RESET"; }
+# In the full-screen view these only reach the log, which the view shows.
+msg() {
+  _log "[INFO] $*"
+  if ((UI_TUI)); then tui_draw; else printf '%s%s•%s %s\n' "$UI_PAD" "$C_BLUE" "$C_RESET" "$*"; fi
+}
+ok() {
+  _log "[ OK ] $*"
+  if ((UI_TUI)); then tui_draw; else printf '%s%s✔%s %s\n' "$UI_PAD" "$C_GREEN" "$C_RESET" "$*"; fi
+}
+skip() {
+  _log "[SKIP] $*"
+  if ((UI_TUI)); then tui_draw; else printf '%s%s↷ %s%s\n' "$UI_PAD" "$C_GRAY" "$*" "$C_RESET"; fi
+}
+hint() {
+  if ((UI_TUI)); then
+    _log "       $*"
+    tui_draw
+  else
+    printf '%s%s%s%s\n' "$UI_PAD" "$C_GRAY" "$*" "$C_RESET"
+  fi
+}
 # Warnings are collected and repeated in the final summary.
 warn() {
-  printf '  %s⚠ %s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2
   _log "[WARN] $*"
   UI_WARNINGS+=("$*")
+  if ((UI_TUI)); then tui_draw; else printf '%s%s⚠ %s%s\n' "$UI_PAD" "$C_YELLOW" "$*" "$C_RESET" >&2; fi
 }
 die() {
-  printf '\n  %s✖ %s%s\n' "$C_RED" "$*" "$C_RESET" >&2
+  tui_stop
+  printf '\n%s%s✖ %s%s\n' "$UI_PAD" "$C_RED" "$*" "$C_RESET" >&2
   _log "[FAIL] $*"
   exit 1
 }
@@ -134,6 +161,15 @@ _ui_meter() {
 step() {
   UI_STEP_N=$((UI_STEP_N + 1))
   UI_STEP_TITLE="$1"
+  ((${#UI_STEP_TITLES[@]})) && _tui_step_advance
+  if ((UI_TUI)); then
+    local pct=$(((UI_STEP_N - 1) * 100 / (UI_STEP_TOTAL ? UI_STEP_TOTAL : 1)))
+    _ui_osc 1 "$pct" "$(printf 'firearchwsl [%02d/%02d] %s' "$UI_STEP_N" "$UI_STEP_TOTAL" "$1")"
+    _log ""
+    _log "════ $(printf '[%02d/%02d]' "$UI_STEP_N" "$UI_STEP_TOTAL") $1 ════"
+    tui_draw
+    return 0
+  fi
   local tag right="" pct=0
   if ((UI_STEP_TOTAL > 0)); then
     tag="$(printf '[%02d/%02d]' "$UI_STEP_N" "$UI_STEP_TOTAL")"
@@ -188,7 +224,18 @@ run() {
   _log "▶ $label"
   _log "\$ $*"
 
-  if ((FIREARCH_VERBOSE)); then
+  if ((UI_TUI)); then
+    # Full-screen view: the view repaints itself while the command runs.
+    (trap - ERR; "$@") >>"$FIREARCH_LOG" 2>&1 </dev/null &
+    local pid=$!
+    UI_ACTIVITY=$label UI_ACTIVITY_T0=$SECONDS
+    while kill -0 "$pid" 2>/dev/null; do
+      tui_draw
+      sleep 0.1
+    done
+    wait "$pid" && rc=0 || rc=$?
+    UI_ACTIVITY=""
+  elif ((FIREARCH_VERBOSE)); then
     printf '  %s▶ %s%s\n' "$C_FIRE" "$label" "$C_RESET"
     { (trap - ERR; "$@") 2>&1 | tee -a "$FIREARCH_LOG"; } && rc=0 || rc=$?
   elif ((UI_TTY)); then
@@ -216,14 +263,15 @@ run() {
   local dur
   dur="$(_fmt_dur $((SECONDS - t0)))"
   if ((rc == 0)); then
-    printf '  %s✔%s %s %s(%s)%s\n' "$C_GREEN" "$C_RESET" "$label" "$C_GRAY" "$dur" "$C_RESET"
+    ((UI_TUI)) || printf '%s%s✔%s %s %s(%s)%s\n' "$UI_PAD" "$C_GREEN" "$C_RESET" "$label" "$C_GRAY" "$dur" "$C_RESET"
     _log "[ OK ] $label ($dur)"
   else
-    printf '  %s✖ %s%s %s(%s, exit %d)%s\n' "$C_RED" "$label" "$C_RESET" "$C_GRAY" "$dur" "$rc" "$C_RESET"
+    ((UI_TUI)) || printf '%s%s✖ %s%s %s(%s, exit %d)%s\n' "$UI_PAD" "$C_RED" "$label" "$C_RESET" "$C_GRAY" "$dur" "$rc" "$C_RESET"
     _log "[FAIL] $label ($dur, exit $rc)"
     UI_FAIL_LABEL="$label"
     UI_FAIL_CMD="$*"
   fi
+  tui_draw
   return "$rc"
 }
 
@@ -254,14 +302,31 @@ pac_install() {
 ## ── Boxes and banner ────────────────────────────────────────────────────────
 
 # ui_box "Title" "line 1" "line 2" …
+# Columns a string takes on screen: no color codes, emoji count as two.
+_ui_width() { sed 's/\x1b\[[0-9;]*m//g' <<<"$1" | wc -L; }
+
+# Rounded box sized to its widest line.
 ui_box() {
-  local title=$1 line
+  local title=$1 line len title_w fill
   shift
-  printf '\n  %s╭─ %s%s%s\n' "$C_FIRE" "$C_BOLD" "$title" "$C_RESET"
+  title_w="$(_ui_width "$title")"
+  local width=$((title_w + 4))
+  local -a lens=()
   for line in "$@"; do
-    printf '  %s│%s  %s\n' "$C_FIRE" "$C_RESET" "$line"
+    len="$(_ui_width "$line")"
+    lens+=("$len")
+    ((len + 4 > width)) && width=$((len + 4))
   done
-  printf '  %s╰─%s\n' "$C_FIRE" "$C_RESET"
+  printf -v fill '%*s' $((width - title_w - 3)) ''
+  printf '\n%s%s╭─ %s%s%s %s%s╮%s\n' "$UI_PAD" "$C_FIRE" "$C_BOLD" "$title" "$C_RESET$C_FIRE" "${fill// /─}" "" "$C_RESET"
+  local i=0
+  for line in "$@"; do
+    printf -v fill '%*s' $((width - lens[i] - 2)) ''
+    printf '%s%s│%s  %s%s%s│%s\n' "$UI_PAD" "$C_FIRE" "$C_RESET" "$line" "$fill" "$C_FIRE" "$C_RESET"
+    i=$((i + 1))
+  done
+  printf -v fill '%*s' "$width" ''
+  printf '%s%s╰%s╯%s\n' "$UI_PAD" "$C_FIRE" "${fill// /─}" "$C_RESET"
 }
 
 # ui_row "Label" "value" → "Label ........ value" (dot leaders, 16 columns).
@@ -307,7 +372,7 @@ ask_input() {
     if ((UI_GUM)); then
       val="$(gum input --header "$prompt" --prompt "› " --value "$def" </dev/tty)" || die "$(t ui.cancelled)"
     else
-      read -rp "  $prompt${def:+ [$def]}: " val </dev/tty || die "$(t ui.cancelled)"
+      read -rp "$UI_PAD$prompt${def:+ [$def]}: " val </dev/tty || die "$(t ui.cancelled)"
       val="${val:-$def}"
     fi
   else
@@ -322,7 +387,7 @@ ask_secret() {
   if ((UI_GUM)); then
     val="$(gum input --password --header "$prompt" --prompt "› " </dev/tty)" || die "$(t ui.cancelled)"
   else
-    read -rsp "  $prompt: " val </dev/tty || die "$(t ui.cancelled)"
+    read -rsp "$UI_PAD$prompt: " val </dev/tty || die "$(t ui.cancelled)"
     echo >&2
   fi
   printf -v "$var" '%s' "$val"
@@ -338,7 +403,7 @@ ask_confirm() {
     ((rc == 130)) && die "$(t ui.cancelled)"
     return "$rc"
   fi
-  read -rp "  $1 $I18N_YES_NO_HINT: " ans </dev/tty || die "$(t ui.cancelled)"
+  read -rp "$UI_PAD$1 $I18N_YES_NO_HINT: " ans </dev/tty || die "$(t ui.cancelled)"
   [[ -z "$ans" || "$ans" =~ $I18N_YES_REGEX ]]
 }
 
@@ -362,11 +427,11 @@ ask_choose() {
         val="$(gum choose --header "$prompt" "${selected[@]}" "$@" </dev/tty)" || die "$(t ui.cancelled)"
       else
         if [[ "$*" == *" — "* ]]; then
-          printf '  %s\n' "$prompt" >&2
-          for opt in "$@"; do printf '    %s%s%s%s\n' "$C_BOLD" "${opt%% *}" "$C_RESET" "${opt#"${opt%% *}"}" >&2; done
-          read -rp "  ($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
+          printf '%s%s\n' "$UI_PAD" "$prompt" >&2
+          for opt in "$@"; do printf '%s  %s%s%s%s\n' "$UI_PAD" "$C_BOLD" "${opt%% *}" "$C_RESET" "${opt#"${opt%% *}"}" >&2; done
+          read -rp "$UI_PAD($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
         else
-          read -rp "  $prompt ($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
+          read -rp "$UI_PAD$prompt ($keys) [$def]: " val </dev/tty || die "$(t ui.cancelled)"
         fi
         val="${val:-$def}"
       fi
@@ -402,7 +467,7 @@ ask_multi() {
       [[ -n "$item" ]] && picked+="${item%% *} "
     done <<<"$out"
   else
-    ((UI_INTERACTIVE)) && printf '  %s\n' "$prompt"
+    ((UI_INTERACTIVE)) && printf '%s%s\n' "$UI_PAD" "$prompt"
     for item in "$@"; do
       if ask_confirm "$(t ui.install_q "$item")"; then picked+="${item%% *} "; fi
     done

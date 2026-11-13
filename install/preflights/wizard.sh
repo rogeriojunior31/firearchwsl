@@ -47,7 +47,7 @@ _valid_hostname() { [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]];
 declare -A _wizard_preset=()
 if [[ -r /etc/firearchwsl/target_user ]]; then
   FIREARCH_USER="$(tr -d '[:space:]' </etc/firearchwsl/target_user)"
-  msg "$(t wiz.user_known "${C_BOLD}${FIREARCH_USER}${C_RESET}")"
+  _wizard_known_user=1
 fi
 for _var in "${WIZARD_VARS[@]}"; do
   if [[ "$_var" == FIREARCH_SKIP ]]; then
@@ -236,13 +236,17 @@ wizard_summary() {
 ## ── Run ─────────────────────────────────────────────────────────────────────
 
 while true; do
+  ui_screen "$(t wiz.title)"
+  ((${_wizard_known_user:-0})) && msg "$(t wiz.user_known "${C_BOLD}${FIREARCH_USER}${C_RESET}")"
   wizard_ask_user
   wizard_ask_password
   wizard_ask_git
   wizard_ask_hostname
   ask_choose FIREARCH_SHELL "$(t wiz.shell_q)" "$(_prev FIREARCH_SHELL bash)" bash fish
   wizard_ask_components
+  ((UI_INTERACTIVE)) && ui_screen
   wizard_summary
+  echo
 
   [[ "${FIREARCH_YES:-0}" == "1" ]] && break
   ((UI_INTERACTIVE)) && hint "$(t wiz.confirm_hint)"
@@ -254,5 +258,8 @@ while true; do
   echo
 done
 FIREARCH_MISE_TOOLS="${FIREARCH_MISE_TOOLS:-${WIZARD_LANGS[*]}}"
+WIZARD_DONE=1
+# Exported: a "retry" from the error screen re-runs the installer with them.
+export FIREARCH_USER FIREARCH_GIT_NAME FIREARCH_GIT_EMAIL FIREARCH_SHELL
 export FIREARCH_SKIP FIREARCH_HOSTNAME FIREARCH_PROFILE FIREARCH_MISE_TOOLS
 _log "[WIZARD] lang=$FIREARCH_LANG user=$FIREARCH_USER host=$FIREARCH_HOSTNAME shell=$FIREARCH_SHELL profile=$FIREARCH_PROFILE skip='${FIREARCH_SKIP}' langs='${FIREARCH_MISE_TOOLS}'"

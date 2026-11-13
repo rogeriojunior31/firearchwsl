@@ -9,6 +9,9 @@ source "$_lib_dir/i18n.sh"
 # Interface: msg/ok/warn/skip/die, step, run, pac_install, ask_*
 # shellcheck source=install/preflights/ui.sh
 source "$_lib_dir/ui.sh"
+# Full-screen view: tui_start, tui_draw, ui_screen
+# shellcheck source=install/preflights/tui.sh
+source "$_lib_dir/tui.sh"
 unset _lib_dir
 
 # Optional components: tuis, langs, lazyvim, doom, docker.

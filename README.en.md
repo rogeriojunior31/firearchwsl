@@ -69,7 +69,7 @@ bash install.sh
 
 Then the summary: **Yes** starts the installation; **No** goes back to the form with your answers pre-filled; **Ctrl+C** cancels.
 
-While it runs, every step header shows the overall progress (bar, percentage, elapsed time), mirrored in the tab title and in the Windows Terminal tab/taskbar progress ring, which turns red if something fails.
+On a real terminal the installer runs **full screen**, in the spirit of Omarchy: the logo centered on top, the overall progress (step, elapsed time, warnings, bar), the 14 steps with a ✔ and the time of each, and a live window on the log. The same progress shows in the tab title and in the Windows Terminal tab/taskbar progress ring, which turns red if something fails. The questions open on a clean screen with the logo, aligned in the same column; the summary comes in a box. On an error you get the step, the command, the log tail and a menu: **retry** (what is done is kept), **read the full log** or **quit**. Without a terminal, with `--verbose`, in windows smaller than 60×20 or with `FIREARCH_TUI=0` it falls back to line-by-line output.
 
 ## What you get
 
