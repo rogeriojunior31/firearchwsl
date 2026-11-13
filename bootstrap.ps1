@@ -126,6 +126,13 @@ else
     tail -n 20 "$log"
     exit 1
   fi
+  # A checkout with local changes (e.g. an earlier -Source copy) is moved
+  # aside, never overwritten.
+  if [[ -d "$dest/.git" && -n "$(git -C "$dest" status --porcelain 2>/dev/null)" ]]; then
+    backup="$dest.bak-$(date +%Y%m%d-%H%M%S)"
+    mv "$dest" "$backup"
+    echo "  local changes kept in $backup"
+  fi
   if [[ -d "$dest/.git" ]]; then
     # The checkout may come from an earlier -Source copy (origin = the
     # developer's SSH remote) or another -Repo: always fetch from -Repo.
