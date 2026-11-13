@@ -80,6 +80,7 @@ Você responde algumas perguntas no começo, confirma o resumo e vai tomar um ca
 - Repositórios **Omarchy** e **Chaotic-AUR** ativos.
 - **mise** com Python, Node, Bun, Rust e Go em `latest` *(opcional)*.
 - **Shells**: `bash` e `fish` prontos (PATH, aliases, histórico, `starship`/`zoxide`/`atuin`/`mise`/`fzf`). Você escolhe qual é o padrão.
+- Pastas `~/Projects`, `~/Work` e `~/Notes` já criadas na sua home (`FIREARCH_HOME_DIRS` muda a lista).
 - **Prompt**: `starship` com nerd-font e paleta `tokyonight`.
 - **Editores**: **LazyVim** e **Doom Emacs** *(opcionais)*.
 - **TUIs**: `lazygit`, `lazydocker`, `yazi` (com previews), `zellij`, `taskwarrior-tui`, `tabiew`, `television`, `navi`, `superfile`, `atuin`, `fzf`.
@@ -204,6 +205,7 @@ Os prompts leem direto do terminal (`/dev/tty`), então continuam funcionando me
 | `FIREARCH_SHELL` | Shell padrão: `bash` (default) ou `fish` |
 | `FIREARCH_SKIP` | Componentes a pular: `langs`, `lazyvim`, `doom`, `docker` (separe por vírgula) |
 | `FIREARCH_MISE_TOOLS` | Toolchains do mise. Default: `python node bun rust go` |
+| `FIREARCH_HOME_DIRS` | Pastas criadas na home. Default: `Projects Work Notes` (`""` não cria nenhuma) |
 | `FIREARCH_VERBOSE=1` | Igual a `--verbose` |
 | `FIREARCH_LOG` | Caminho do log. Default: `/var/log/firearchwsl/install-<data>.log` |
 | `FORCE_CONFIG=1` | Sobrescreve `~/.bashrc` e `config.fish` (com backup `.bak-<data>`) |
@@ -232,7 +234,7 @@ O `install.sh` é um orquestrador que dá `source` em cada script. **A ordem imp
 | 10 | TUIs | `install/pkgs/tuis.sh` | TUIs e previews do yazi |
 | 11 | Linguagens | `install/pkgs/install_langs.sh` | `mise use -g <tool>@latest` *(opcional)* |
 | 12 | Editores | `install/pkgs/editors.sh` | LazyVim e Doom Emacs *(opcionais)* |
-| 13 | Configs | `config/config.sh` | rc files, starship, shell padrão |
+| 13 | Configs | `config/config.sh` | rc files, starship, pastas `~/Projects`, `~/Work`, `~/Notes`, shell padrão |
 | 14 | Docker | `config/docker.sh` | Pacotes, `daemon.json`, grupo, serviço *(opcional)* |
 | ∎ | Final | `install/preflights/finale.sh` | Logo animado (`tte`), resumo, próximos passos |
 

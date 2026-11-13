@@ -74,6 +74,7 @@ Then the summary: **Yes** starts the installation; **No** goes back to the form 
 - **Chaotic-AUR** and **Omarchy** repositories (Omarchy is unsigned, so it is placed last: signed repos always win).
 - **mise** with Python, Node, Bun, Rust and Go *(optional)*. mise is told to ignore the Windows-side `~/.config/mise`.
 - **bash** and **fish** ready to go, **starship** prompt, modern CLIs (`eza`, `bat`, `fd`, `ripgrep`, `zoxide`, `atuin`, `fzf`…) and TUIs (`lazygit`, `lazydocker`, `yazi`, `zellij`…).
+- `~/Projects`, `~/Work` and `~/Notes` ready in your home (`FIREARCH_HOME_DIRS` changes the list; `""` creates none).
 - **LazyVim** and **Doom Emacs** *(optional)*.
 - Native **Docker** with `buildx` and `compose` *(optional)*.
 

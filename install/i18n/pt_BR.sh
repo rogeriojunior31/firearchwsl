@@ -55,6 +55,7 @@ Variáveis de ambiente (todas opcionais no modo interativo):
   FIREARCH_SHELL       shell padrão: bash (default) ou fish
   FIREARCH_SKIP        componentes a pular: langs,lazyvim,doom,docker
   FIREARCH_MISE_TOOLS  toolchains do mise (default: \"python node bun rust go\")
+  FIREARCH_HOME_DIRS   pastas criadas na home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   igual a --verbose
   FIREARCH_NO_GUM=1    prompts simples em vez do gum
   FIREARCH_LOG         caminho do arquivo de log
@@ -210,6 +211,8 @@ MSG[cfg.rc_updated]="%s atualizado para o novo padrão (não tinha edições loc
 MSG[cfg.rc_overwritten]="%s sobrescrito (backup: %s)."
 MSG[cfg.rc_preserved]="%s tem edições locais — preservado (FORCE_CONFIG=1 sobrescreve com backup)."
 MSG[cfg.starship]="Starship apontando para o tema do firearchwsl."
+MSG[cfg.home_dirs]="Pastas na sua home: %s."
+MSG[cfg.home_dir_invalid]="Pulando a pasta %s — use um nome relativo à home."
 MSG[cfg.shell_missing]="Shell %s não encontrado — mantendo o shell atual."
 MSG[cfg.shell_already]="Shell padrão já é %s."
 MSG[cfg.shell_set]="Definindo %s como shell padrão"

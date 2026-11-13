@@ -52,6 +52,7 @@ check "git identity configured"            bash -c '[[ "$(sudo -Hu ci git config
 check "Omarchy is the last repo"           bash -c '[[ "$(grep -E "^\[" /etc/pacman.conf | tail -1)" == "[omarchy]" ]]'
 check "rc files installed, owned, 0644"    bash -c '[[ "$(stat -c "%U %a" /home/ci/.bashrc)" == "ci 644" ]]'
 check "starship config linked"             test -L /home/ci/.config/starship.toml
+check "home folders created, owned by user" bash -c 'for d in Projects Work Notes; do [[ "$(stat -c %U /home/ci/$d)" == ci ]] || exit 1; done'
 check "LazyVim cloned"                     test -f /home/ci/.config/nvim/init.lua
 check "mise tools installed"               sudo -Hu ci bash -lc 'cd ~ && mise ls --current | grep -q node'
 check "fish config loads"                  sudo -Hu ci fish -c 'type -q starship'

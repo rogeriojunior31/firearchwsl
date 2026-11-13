@@ -56,6 +56,7 @@ Environment variables (all optional in interactive mode):
   FIREARCH_SHELL       default shell: bash (default) or fish
   FIREARCH_SKIP        components to skip: langs,lazyvim,doom,docker
   FIREARCH_MISE_TOOLS  mise toolchains (default: \"python node bun rust go\")
+  FIREARCH_HOME_DIRS   folders created in the home (default: \"Projects Work Notes\")
   FIREARCH_VERBOSE=1   same as --verbose
   FIREARCH_NO_GUM=1    plain prompts instead of gum
   FIREARCH_LOG         log file path
@@ -211,6 +212,8 @@ MSG[cfg.rc_updated]="%s updated to the new default (it had no local edits)."
 MSG[cfg.rc_overwritten]="%s overwritten (backup: %s)."
 MSG[cfg.rc_preserved]="%s has local edits — preserved (FORCE_CONFIG=1 overwrites with a backup)."
 MSG[cfg.starship]="Starship pointed at the firearchwsl theme."
+MSG[cfg.home_dirs]="Folders in your home: %s."
+MSG[cfg.home_dir_invalid]="Skipping folder %s — use a name relative to the home."
 MSG[cfg.shell_missing]="Shell %s not found — keeping the current shell."
 MSG[cfg.shell_already]="Default shell is already %s."
 MSG[cfg.shell_set]="Setting %s as the default shell"

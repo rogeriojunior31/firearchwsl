@@ -64,6 +64,20 @@ install_rc "$_share/default/config.fish" "$TARGET_HOME/.config/fish/config.fish"
 ln -sf "$_share/config/starship.toml" "$TARGET_HOME/.config/starship.toml"
 ok "$(t cfg.starship)"
 
+# Starter folders in the home (~/Projects, ~/Work, ~/Notes). Existing ones are
+# left untouched; FIREARCH_HOME_DIRS="" creates none.
+_dirs=()
+for _dir in ${FIREARCH_HOME_DIRS-Projects Work Notes}; do
+  if [[ "$_dir" == /* || "$_dir" == *..* ]]; then
+    warn "$(t cfg.home_dir_invalid "$_dir")"
+    continue
+  fi
+  as_user mkdir -p "$TARGET_HOME/$_dir"
+  # shellcheck disable=SC2088 # display text
+  _dirs+=("~/$_dir")
+done
+((${#_dirs[@]})) && ok "$(t cfg.home_dirs "${_dirs[*]}")"
+
 # Everything written here belongs to the target user
 chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config" "$TARGET_HOME/.local"
 chown -h "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/starship.toml"
@@ -80,4 +94,4 @@ else
   run "$(t cfg.shell_set "$_shell_name")" usermod -s "$_shell_path" "$TARGET_USER"
 fi
 rm -rf "$_previous"
-unset _share _previous _shell_name _shell_path
+unset _share _previous _shell_name _shell_path _dirs _dir
