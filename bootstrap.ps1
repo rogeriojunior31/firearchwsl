@@ -19,6 +19,9 @@
   irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/main/bootstrap.ps1 | iex
 
 .EXAMPLE
+  $env:FIREARCH_BRANCH = 'my-branch'; irm https://raw.githubusercontent.com/rogeriojunior31/firearchwsl/my-branch/bootstrap.ps1 | iex
+
+.EXAMPLE
   .\bootstrap.ps1 -Name archdev -Branch my-branch
 
 .EXAMPLE
@@ -26,11 +29,12 @@
 #>
 [CmdletBinding()]
 param(
-  # WSL distro name to install into / create.
-  [string]$Name = 'archlinux',
+  # WSL distro name to install into / create. `irm | iex` cannot pass
+  # parameters, so these three also read FIREARCH_DISTRO / _REPO / _BRANCH.
+  [string]$Name = $(if ($env:FIREARCH_DISTRO) { $env:FIREARCH_DISTRO } else { 'archlinux' }),
   # Git repository and branch to clone.
-  [string]$Repo = 'https://github.com/rogeriojunior31/firearchwsl.git',
-  [string]$Branch = 'main',
+  [string]$Repo = $(if ($env:FIREARCH_REPO) { $env:FIREARCH_REPO } else { 'https://github.com/rogeriojunior31/firearchwsl.git' }),
+  [string]$Branch = $(if ($env:FIREARCH_BRANCH) { $env:FIREARCH_BRANCH } else { 'main' }),
   # Local checkout to copy instead of cloning (Windows path).
   [string]$Source,
   # Skip the installer's final confirmation (install.sh --yes).
